@@ -1,0 +1,19 @@
+[package]
+author = "BK2004"
+name = "Rust-C-Compiler"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "driver"
+path = "src/driver/main.rs"
+
+[lib]
+name = "compiler"
+path = "src/compiler/lib.rs"
+
+[dependencies]
+clap = { version = "4.0", features = ["derive"] }
+utf8-chars = "3.0.1"
