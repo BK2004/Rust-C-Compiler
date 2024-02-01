@@ -8,6 +8,6 @@ fn main() {
 
 	match cli::compile(&args) {
 		Err(error) => println!("Error: {}", error),
-		Ok(_) => println!("Successfully compiled files!"),
+		Ok(_) => println!("{}\nSuccessfully compiled files!", "=".repeat(28)),
 	}
 }

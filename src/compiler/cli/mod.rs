@@ -1,5 +1,5 @@
 use clap::Parser;
-use crate::scanning::Scanner;
+use crate::scanning::{token, Scanner};
 
 #[derive(Debug, Parser)]
 #[command(author, version)]
@@ -36,9 +36,13 @@ pub fn compile(args: &Args) -> std::io::Result<()> {
 
 		let mut scanner = Scanner::open_file(filename.clone())?;
 
-		if let Ok(Some(c)) = scanner.next_char() {
-			println!("{}", c);
+		while let Some(c) = scanner.scan()? {
+			if c == token::Token::EndOfFile {
+				break;
+			}
+			print!("{:?} ", c);
 		}
+		println!();
 	}
 
 	Ok(())
