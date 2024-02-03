@@ -1,5 +1,6 @@
 use crate::scanning::token::{Token};
 
+#[derive(Debug)]
 pub struct ASTNode {
 	token: Token,
 	left: Option<Box<ASTNode>>,
@@ -12,6 +13,14 @@ impl ASTNode {
 			token,
 			left: None,
 			right: None, 
+		}
+	}
+
+	pub fn new_from_children(token: Token, left: ASTNode, right: ASTNode) -> Self {
+		Self {
+			token,
+			left: Some(Box::new(left)),
+			right: Some(Box::new(right))
 		}
 	}
 
