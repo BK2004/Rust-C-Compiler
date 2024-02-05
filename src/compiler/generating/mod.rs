@@ -1,8 +1,7 @@
 pub mod writer;
 pub mod llvm;
 
-use std::fs::File;
-use std::io::{Result, Write};
+use std::io::Result;
 
 use crate::parsing::ast::ASTNode;
 use crate::parsing::Parser;
@@ -60,25 +59,13 @@ impl Generator {
 
 	// Determines stack allocations for expression
 	pub fn determine_binary_expression_stack_allocation(&mut self, root: &ASTNode) -> Result<Vec<LLVMStackEntry>> {
-		// If root has children, it may be a unary or binary operation; else, it is a literal and a register should immediately be assigned
-		if let Some(left) = root.left() {
-			let mut left_allocs = self.determine_binary_expression_stack_allocation(&left)?;
-
-			if let Some(right) = root.right() {
+		match root {
+			ASTNode::Literal(Literal::Integer(x)) => Ok([LLVMStackEntry::new(LLVMValue::VirtualRegister(self.claim_virtual_register()), 4)].to_vec()),
+			ASTNode::Binary{token, left, right} => {
+				let mut left_allocs = self.determine_binary_expression_stack_allocation(&left)?;
 				left_allocs.append(&mut self.determine_binary_expression_stack_allocation(&right)?);
 
-				Ok(left_allocs)
-			} else {
-				Ok(left_allocs)
-			}
-		}
-		else if let Some(right) = root.right() {
-			Ok(self.determine_binary_expression_stack_allocation(&right)?)
-		} else {
-			// Literal expected
-			match root.token() {
-				Token::IntegerLiteral(x) => Ok([LLVMStackEntry::new(LLVMValue::VirtualRegister(self.claim_virtual_register()), 4)].to_vec()),
-				_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Literal expected"))
+				return Ok(left_allocs);
 			}
 		}
 	}
@@ -93,7 +80,8 @@ impl Generator {
 	}
 
 	// Traverse AST and generate LLVM for the tree
-	pub fn ast_to_llvm(&mut self, root: &ASTNode) -> Result<LLVMValue> {
+	// pub fn ast_to_llvm(&mut self, root: &ASTNode) -> Result<LLVMValue> {
 		
-	}
+
+	// }
 }

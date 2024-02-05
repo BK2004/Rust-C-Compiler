@@ -44,7 +44,7 @@ impl Parser {
 		};
 
 		match token {
-			Token::IntegerLiteral(_) => {self.current_token = self.scanner.scan()?; Ok(ASTNode::new(token.clone()))},
+			Token::Literal(Literal::Integer(x)) => {self.current_token = self.scanner.scan()?; Ok(ASTNode::Literal(Literal::Integer(x)))},
 			_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid token"))
 		}
 	}
@@ -83,7 +83,7 @@ impl Parser {
 			right = self.parse_binary_operation(self.get_precedence(&token)?)?;
 
 			// Join left and right into parent node connected by operator token
-			left = ASTNode::new_from_children(token.clone(), left, right);
+			left = ASTNode::Binary { token: token.clone(), left: Box::new(left), right: Box::new(right), };
 
 			// If EOF reached, return the new left
 			if let Some(Token::EndOfFile) = self.current_token {

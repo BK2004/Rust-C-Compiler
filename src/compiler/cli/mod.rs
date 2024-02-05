@@ -47,39 +47,20 @@ pub fn compile(args: &Args) -> Result<()> {
 	Ok(())
 }
 
-pub fn interpret_ast(node: &crate::parsing::ast::ASTNode) -> Result<i32> {
-	if let Some(l) = node.left() {
-		let left = interpret_ast(&**l)?;
+pub fn interpret_ast(node: &crate::parsing::ast::ASTNode) -> Result<i128> {
+	match node {
+		crate::parsing::ast::ASTNode::Literal(Literal::Integer(x)) => Ok(*x),
+		crate::parsing::ast::ASTNode::Binary{token, left, right} => {
+			let left_res = interpret_ast(&left)?;
+			let right_res = interpret_ast(&right)?;
 
-		// Check for right child; if it's there, this is a binary operation
-		if let Some(r) = node.right() {
-			let right = interpret_ast(&**r)?;
-
-			// Match binary operators
-			return match node.token() {
-				Token::Asterisk => Ok(left * right),
-				Token::Minus => Ok(left - right),
-				Token::Plus => Ok(left + right),
-				Token::Slash => Ok(left / right),
+			return match token {
+				Token::Asterisk => Ok(left_res * right_res),
+				Token::Minus => Ok(left_res - right_res),
+				Token::Plus => Ok(left_res + right_res),
+				Token::Slash => Ok(left_res / right_res),
 				_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid token"))
-			}
-		} else { // Else this is unary (not yet implemented, so error)
-			return match node.token() {
-				_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid token")),
-			}
+			};
 		}
-	} else if let Some(r) = node.right() { // If ony right node is present, this is unary
-		let right = interpret_ast(&**r)?;
-
-		// Match unary operators (not implemented yet, so error)
-		return match node.token() {
-			_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid token"))
-		}
-	}
-
-	// No node should have zero children (unless token is a literal)
-	match node.token() {
-		Token::IntegerLiteral(x) => Ok(*x),
-		_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid token"))
 	}
 }

@@ -2,11 +2,16 @@
 pub enum Token {
 	EndOfFile,
 	Invalid,
-	IntegerLiteral(i32),
+	Literal(Literal),
 	Plus,
 	Minus,
 	Asterisk,
 	Slash
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Literal {
+	Integer(i128)
 }
 
 pub const TOKEN_SYMBOLS: &[(&str, Token)] = &[
