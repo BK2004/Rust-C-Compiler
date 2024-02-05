@@ -12,6 +12,7 @@ pub const OPERATOR_PRECEDENCE: &[(Token, u8)] = &[
 	(Token::Minus, 11),
 ];
 
+#[derive(Debug)]
 pub struct Parser {
 	scanner: Scanner,
 	current_token: Option<Token>,
