@@ -6,8 +6,19 @@ pub enum Token {
 	Plus,
 	Minus,
 	Asterisk,
-	Slash
+	Slash,
+	Semicolon,
+	Identifier(Identifier),
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Identifier {
+	Print,
+}
+
+pub const IDENTIFIER_SYMBOLS: &[(&str, Identifier)] = &[
+	("print", Identifier::Print),
+];
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Literal {
@@ -18,5 +29,6 @@ pub const TOKEN_SYMBOLS: &[(&str, Token)] = &[
 	("+", Token::Plus),
 	("-", Token::Minus),
 	("*", Token::Asterisk),
-	("/", Token::Slash)
+	("/", Token::Slash),
+	(";", Token::Semicolon),
 ];

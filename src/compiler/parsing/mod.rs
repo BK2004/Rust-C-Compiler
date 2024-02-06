@@ -37,6 +37,35 @@ impl Parser {
 		Ok(())
 	}
 
+	// Verify that token matches what is expected
+	pub fn match_token(&mut self, token: Token) -> Result<()> {
+		match self.current_token {
+			Some(t) => match t {
+				token => Ok(()),
+				_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected different token than what was received"))
+			},
+			None => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected different token than what was received"))
+		}
+	}
+
+	// Parse a statement, which for now contains an identifier followed by a binary expression followed by a semicolon
+	pub fn parse_statement(&mut self) -> Result<Option<ASTNode>> {
+		// If EOL, None should be returned
+		if let Some(Token::EndOfFile) = self.current_token {
+			return Ok(None)
+		}
+
+		// Statement should follow the pattern "<print> <binary_expr> ;"
+		self.match_token(Token::Identifier(Identifier::Print))?;
+		self.scan_next()?;
+
+		let binary_node = self.parse_binary_operation(0)?;
+		self.match_token(Token::Semicolon)?;
+		self.scan_next()?;
+
+		Ok(Some(binary_node))
+	}
+
 	// Parse a terminal node, i.e. a node is created with a literal token
 	pub fn parse_terminal_node(&mut self) -> Result<ASTNode> {
 		let Some(token) = self.current_token.clone() else {
@@ -45,22 +74,23 @@ impl Parser {
 
 		match token {
 			Token::Literal(Literal::Integer(x)) => {self.current_token = self.scanner.scan()?; Ok(ASTNode::Literal(Literal::Integer(x)))},
-			_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid token"))
+			_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected literal"))
 		}
 	}
 
 	// Get precedence of token or error if not a valid operator
 	pub fn get_precedence(&self, token: &Token) -> Result<u8> {
+		dbg!(token);
 		// Search precedence array for token, else invalid token
 		for (_, prec) in OPERATOR_PRECEDENCE.iter().enumerate() {
 			if prec.0 == *token {
 				return Ok(prec.1);
 			}
 		}
-		Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid token"))
+		Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected token with precedence"))
 	}
 
-	pub fn parse_binary_operation(&mut self, mut prev: u8) -> Result<ASTNode> {
+	pub fn parse_binary_operation(&mut self, prev: u8) -> Result<ASTNode> {
 		let mut left = self.parse_terminal_node()?;
 		let mut right: ASTNode;
 
@@ -72,6 +102,8 @@ impl Parser {
 		}
 
 		if let Token::EndOfFile = token {
+			return Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected ';'. reached EOF"));
+		} else if let Token::Semicolon = token {
 			return Ok(left);
 		}
 
@@ -87,6 +119,8 @@ impl Parser {
 
 			// If EOF reached, return the new left
 			if let Some(Token::EndOfFile) = self.current_token {
+				return Ok(left);
+			} else if let Some(Token::Semicolon) = self.current_token {
 				return Ok(left);
 			}
 

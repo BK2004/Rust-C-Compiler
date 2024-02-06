@@ -132,22 +132,19 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 	}
 
 	// Print integer (i32)
-	pub fn print_int(&mut self, val: &LLVMValue) -> Result<()> {
-		match val {
-			LLVMValue::VirtualRegister(reg) => Ok(self.writeln(&format!("\tcall i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i32 %{})", reg))?),
-			_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected register"))
-		}
+	pub fn print_int(&mut self, reg: u32) -> Result<()> {
+		self.writeln(&format!("\tcall i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i32 %{})", reg))
 	}
 
 	pub fn write(&mut self, msg: &str) -> Result<()> {
 		self.target.write(msg.as_bytes())
-			.map(|v| Ok(()))
+			.map(|_| Ok(()))
 			.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?
 	}
 
 	pub fn writeln(&mut self, msg: &str) -> Result<()> {
 		self.target.write((msg.to_owned() + "\n").as_bytes())
-			.map(|v| Ok(()))
+			.map(|_| Ok(()))
 			.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?
 	}
 

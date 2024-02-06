@@ -83,6 +83,21 @@ impl Scanner {
 				return Ok(Some(Token::Literal(Literal::Integer(num))));
 			}
 
+			// Check if c is start of an identifier
+			if c.is_alphabetic() {
+				let identifier = self.scan_identifier(c)?;
+				println!("{identifier}");
+
+				// Search for identifier in list of identifiers; if not found, error
+				for (_, id) in IDENTIFIER_SYMBOLS.iter().enumerate() {
+					if identifier.eq(id.0) {
+						return Ok(Some(Token::Identifier(id.1)));
+					}
+				}
+
+				return Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid identifier found."));
+			}
+
 			// Generate possible symbols that c represents
 			let mut remaining_symbols: Vec<&(&str, Token)> = Vec::new();
 			let mut curr: String = String::from(c);
@@ -134,6 +149,23 @@ impl Scanner {
 		while c.is_numeric() {
 			res = res * 10 + (c as i32 - ('0' as i32));
 			
+			match self.next_char()? {
+				Some(next) => {c = next;},
+				None => return Ok(res)
+			}
+		}
+
+		self.put_back(c);
+
+		Ok(res)
+	}
+
+	// Scan in identifier
+	pub fn scan_identifier(&mut self, mut c: char) -> Result<String> {
+		let mut res: String = String::from("");
+		while c.is_alphanumeric() {
+			res.insert(res.len(), c);
+
 			match self.next_char()? {
 				Some(next) => {c = next;},
 				None => return Ok(res)

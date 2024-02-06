@@ -44,12 +44,15 @@ impl Generator {
 		self.writer.write_preamble()?;
 
 		// Allocate variable stack space and write to output
-		let ast = parser.parse_binary_operation(0)?;
-		let alloc_list = self.determine_binary_expression_stack_allocation(&ast)?;
-		self.allocate_stack(alloc_list)?;
+		while let Some(ast) = parser.parse_statement()? {
+			self.free_register_count = self.next_register - 1;
+			let alloc_list = self.determine_binary_expression_stack_allocation(&ast)?;
+			self.allocate_stack(alloc_list)?;
 
-		let root = self.ast_to_llvm(&ast)?;
-		self.writer.print_int(&root)?;
+			let mut root = self.ast_to_llvm(&ast)?;
+			self.ensure_registers_loaded(&mut[&mut root])?;
+			self.print_int(&root)?;
+		}
 
 		self.writer.write_postamble()?;
 
@@ -73,11 +76,11 @@ impl Generator {
 	// Determines stack allocations for expression
 	pub fn determine_binary_expression_stack_allocation(&mut self, root: &ASTNode) -> Result<Vec<LLVMStackEntry>> {
 		match root {
-			ASTNode::Literal(Literal::Integer(x)) => {
+			ASTNode::Literal(Literal::Integer(_)) => {
 				self.free_register_count += 1;
 				Ok([LLVMStackEntry::new(LLVMValue::VirtualRegister(self.update_virtual_register(1)), 4)].to_vec())
 			},
-			ASTNode::Binary{token, left, right} => {
+			ASTNode::Binary{token: _, left, right} => {
 				let mut left_allocs = self.determine_binary_expression_stack_allocation(&left)?;
 				left_allocs.append(&mut self.determine_binary_expression_stack_allocation(&right)?);
 
@@ -88,7 +91,7 @@ impl Generator {
 
 	// Allocates stack space given list of stack entries
 	pub fn allocate_stack(&mut self, entries: Vec<LLVMStackEntry>) -> Result<()> {
-		for (i, entry) in entries.iter().enumerate() {
+		for (_, entry) in entries.iter().enumerate() {
 			self.writer.write_alloc(entry)?;
 		}
 
@@ -139,13 +142,25 @@ impl Generator {
 
 	}
 
+	// Print integer
+	pub fn print_int(&mut self, reg: &LLVMValue) -> Result<()> {
+		Ok(match reg {
+			LLVMValue::VirtualRegister(reg_id) => {
+				// Printing int returns value so register count needs to increase
+				self.update_virtual_register(1);
+				self.writer.print_int(*reg_id)
+			},
+			LLVMValue::None => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected virtual register"))
+		}?)
+	}
+
 	// Generate constant given literal
 	pub fn generate_literal(&mut self, literal: &Literal) -> Result<LLVMValue> {
 		let reg = self.claim_free_register();
 		self.writer.write_literal(literal, reg)?;
 
 		match literal {
-			Literal::Integer(x) => Ok(LLVMValue::VirtualRegister(reg)),
+			Literal::Integer(_) => Ok(LLVMValue::VirtualRegister(reg)),
 		}
 	}
 
