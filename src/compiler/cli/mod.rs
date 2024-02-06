@@ -39,7 +39,7 @@ pub fn compile(args: &Args) -> Result<()> {
 		let mut parser = crate::parsing::Parser::new(scanner)?;
 
 		let mut generator = crate::generating::Generator::from_filename(filename.clone() + ".ll")?;
-		generator.generate(&mut parser);
+		generator.generate(&mut parser)?;
 
 		// println!("{}", interpret_ast(&parser.parse_binary_operation(0)?)?);
 	}
@@ -47,7 +47,7 @@ pub fn compile(args: &Args) -> Result<()> {
 	Ok(())
 }
 
-pub fn interpret_ast(node: &crate::parsing::ast::ASTNode) -> Result<i128> {
+pub fn interpret_ast(node: &crate::parsing::ast::ASTNode) -> Result<i32> {
 	match node {
 		crate::parsing::ast::ASTNode::Literal(Literal::Integer(x)) => Ok(*x),
 		crate::parsing::ast::ASTNode::Binary{token, left, right} => {

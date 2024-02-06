@@ -129,10 +129,10 @@ impl Scanner {
 	}
 
 	// Scan in integer literal
-	pub fn scan_integer_literal(&mut self, mut c: char) -> Result<i128> {
-		let mut res: i128 = 0;
+	pub fn scan_integer_literal(&mut self, mut c: char) -> Result<i32> {
+		let mut res: i32 = 0;
 		while c.is_numeric() {
-			res = res * 10 + (c as i128 - ('0' as i128));
+			res = res * 10 + (c as i32 - ('0' as i32));
 			
 			match self.next_char()? {
 				Some(next) => {c = next;},

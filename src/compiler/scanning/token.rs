@@ -11,7 +11,7 @@ pub enum Token {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Literal {
-	Integer(i128)
+	Integer(i32)
 }
 
 pub const TOKEN_SYMBOLS: &[(&str, Token)] = &[
