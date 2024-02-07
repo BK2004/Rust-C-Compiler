@@ -14,10 +14,12 @@ pub enum Token {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Identifier {
 	Print,
+	Pascal,
 }
 
 pub const IDENTIFIER_SYMBOLS: &[(&str, Identifier)] = &[
 	("print", Identifier::Print),
+	("pascal", Identifier::Pascal),
 ];
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

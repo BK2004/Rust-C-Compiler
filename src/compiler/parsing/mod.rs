@@ -38,32 +38,48 @@ impl Parser {
 	}
 
 	// Verify that token matches what is expected
-	pub fn match_token(&mut self, token: Token) -> Result<()> {
+	pub fn match_token(&mut self, tokens: &[Token]) -> Result<()> {
+		for (_, token) in tokens.iter().enumerate() {
+			let matched = match self.current_token {
+				Some(t) => *token == t,
+				None => false,
+			};
+
+			if matched {
+				return Ok(());
+			}
+		}
+		
+		Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected different token than what was received"))
+	}
+
+	// Verify that current token matches an identifier and return said identifier
+	pub fn match_identifier(&mut self) -> Result<Identifier> {
 		match self.current_token {
 			Some(t) => match t {
-				token => Ok(()),
-				_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected different token than what was received"))
+				Token::Identifier(i) => Ok(i),
+				_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected identifier")),
 			},
-			None => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected different token than what was received"))
+			None => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected identifier"))
 		}
 	}
 
 	// Parse a statement, which for now contains an identifier followed by a binary expression followed by a semicolon
-	pub fn parse_statement(&mut self) -> Result<Option<ASTNode>> {
+	pub fn parse_statement(&mut self) -> Result<Option<(Identifier, ASTNode)>> {
 		// If EOL, None should be returned
 		if let Some(Token::EndOfFile) = self.current_token {
 			return Ok(None)
 		}
 
 		// Statement should follow the pattern "<print> <binary_expr> ;"
-		self.match_token(Token::Identifier(Identifier::Print))?;
+		let identifier = self.match_identifier()?;
 		self.scan_next()?;
 
 		let binary_node = self.parse_binary_operation(0)?;
-		self.match_token(Token::Semicolon)?;
+		self.match_token(&[Token::Semicolon])?;
 		self.scan_next()?;
 
-		Ok(Some(binary_node))
+		Ok(Some((identifier, binary_node)))
 	}
 
 	// Parse a terminal node, i.e. a node is created with a literal token

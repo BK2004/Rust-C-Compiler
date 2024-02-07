@@ -44,14 +44,22 @@ impl Generator {
 		self.writer.write_preamble()?;
 
 		// Allocate variable stack space and write to output
-		while let Some(ast) = parser.parse_statement()? {
+		while let Some(statement) = parser.parse_statement()? {
 			self.free_register_count = self.next_register - 1;
-			let alloc_list = self.determine_binary_expression_stack_allocation(&ast)?;
+			let alloc_list = self.determine_binary_expression_stack_allocation(&statement.1)?;
 			self.allocate_stack(alloc_list)?;
 
-			let mut root = self.ast_to_llvm(&ast)?;
+			let mut root = self.ast_to_llvm(&statement.1)?;
 			self.ensure_registers_loaded(&mut[&mut root])?;
-			self.print_int(&root)?;
+
+			match statement.0 {
+				Identifier::Print => {
+					self.print_int(&root)?;
+				},
+				Identifier::Pascal => {
+					self.pascal(self.interpret_ast(&statement.1)? as u32)?;
+				}
+			};
 		}
 
 		self.writer.write_postamble()?;
@@ -154,6 +162,36 @@ impl Generator {
 		}?)
 	}
 
+	// Calculate nth row of Pascal's triangle
+	pub fn pascal(&mut self, n: u32) -> Result<()> {
+		let mut res: u32 = 0;
+
+		let mut n_fact = 1;
+		for i in 1..n+1 {
+			n_fact *= i;
+		}
+
+		for i in 0..n+1 {
+			let mut r_fact = 1;
+			for j in 1..i+1 {
+				r_fact *= j;
+			}
+
+			let mut n_minus_r_fact = 1;
+			for j in 1..(n-i+1) {
+				n_minus_r_fact *= j;
+			}
+
+			res += n_fact / (r_fact * n_minus_r_fact);
+		}
+
+		let reg = self.update_virtual_register(1);
+		self.writer.writeln(&format!("\t%{} = add i32 {}, 0", reg, res))?;
+		self.print_int(&LLVMValue::VirtualRegister(reg))?;
+
+		Ok(())
+	}
+
 	// Generate constant given literal
 	pub fn generate_literal(&mut self, literal: &Literal) -> Result<LLVMValue> {
 		let reg = self.claim_free_register();
@@ -210,5 +248,24 @@ impl Generator {
 		self.writer.write_div(&left, &right, reg)?;
 
 		Ok(LLVMValue::VirtualRegister(reg))
+	}
+
+	// Interpret an AST recursively
+	pub fn interpret_ast(&self, node: &crate::parsing::ast::ASTNode) -> Result<i32> {
+		match node {
+			crate::parsing::ast::ASTNode::Literal(Literal::Integer(x)) => Ok(*x),
+			crate::parsing::ast::ASTNode::Binary{token, left, right} => {
+				let left_res = self.interpret_ast(&left)?;
+				let right_res = self.interpret_ast(&right)?;
+	
+				return match token {
+					Token::Asterisk => Ok(left_res * right_res),
+					Token::Minus => Ok(left_res - right_res),
+					Token::Plus => Ok(left_res + right_res),
+					Token::Slash => Ok(left_res / right_res),
+					_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid token"))
+				};
+			}
+		}
 	}
 }

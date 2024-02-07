@@ -1,6 +1,5 @@
 use clap::Parser;
 use std::io::Result;
-use crate::scanning::token::*;
 
 #[derive(Debug, Parser)]
 #[command(author, version)]
@@ -45,22 +44,4 @@ pub fn compile(args: &Args) -> Result<()> {
 	}
 
 	Ok(())
-}
-
-pub fn interpret_ast(node: &crate::parsing::ast::ASTNode) -> Result<i32> {
-	match node {
-		crate::parsing::ast::ASTNode::Literal(Literal::Integer(x)) => Ok(*x),
-		crate::parsing::ast::ASTNode::Binary{token, left, right} => {
-			let left_res = interpret_ast(&left)?;
-			let right_res = interpret_ast(&right)?;
-
-			return match token {
-				Token::Asterisk => Ok(left_res * right_res),
-				Token::Minus => Ok(left_res - right_res),
-				Token::Plus => Ok(left_res + right_res),
-				Token::Slash => Ok(left_res / right_res),
-				_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid token"))
-			};
-		}
-	}
 }
