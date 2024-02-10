@@ -66,10 +66,10 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 
 	// Write an allocation to the LLVM file (only implemented for i32 as of now)
 	pub fn write_alloc(&mut self, stack_entry: &LLVMStackEntry) -> Result<()> {
-		if let LLVMValue::VirtualRegister(reg) = stack_entry.register() {
-			self.writeln(&format!("\t%{} = alloca i32, align {}", reg, stack_entry.align_bytes()))
+		if let LLVMValue::VirtualRegister{ val, is_pointer: _ } = stack_entry.register() {
+			self.writeln(&format!("\t%{} = alloca i32, align {}", val, stack_entry.align_bytes()))
 		} else {
-			Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: stack_entry.register().clone() })
+			Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister{ val: 0, is_pointer: false }, received: stack_entry.register().clone() })
 		}
 	}
 
@@ -92,44 +92,44 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 	// Write a multiplication to the LLVM file
 	pub fn write_mul(&mut self, left: &LLVMValue, right: &LLVMValue, reg: u32) -> Result<()> {
 		match left {
-			LLVMValue::VirtualRegister(l) => match right {
-				LLVMValue::VirtualRegister(r) => Ok(self.writeln(&format!("\t%{} = mul nsw i32 %{}, %{}", reg, l, r))?),
-				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: right.clone() })
+			LLVMValue::VirtualRegister{ val: l, is_pointer: _ } => match right {
+				LLVMValue::VirtualRegister{ val: r, is_pointer: _ } => Ok(self.writeln(&format!("\t%{} = mul nsw i32 %{}, %{}", reg, l, r))?),
+				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister{ val: 0, is_pointer: false }, received: right.clone() })
 			},
-			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: left.clone() })
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister{ val: 0, is_pointer: false }, received: left.clone() })
 		}
 	}
 
 	// Write a subtraction operation to the LLVM file
 	pub fn write_sub(&mut self, left: &LLVMValue, right: &LLVMValue, reg: u32) -> Result<()> {
 		match left {
-			LLVMValue::VirtualRegister(l) => match right {
-				LLVMValue::VirtualRegister(r) => Ok(self.writeln(&format!("\t%{} = sub nsw i32 %{}, %{}", reg, l, r))?),
-				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: right.clone() })
+			LLVMValue::VirtualRegister{ val: l, is_pointer: _ } => match right {
+				LLVMValue::VirtualRegister{ val: r, is_pointer: _ } => Ok(self.writeln(&format!("\t%{} = sub nsw i32 %{}, %{}", reg, l, r))?),
+				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister{ val: 0, is_pointer: false }, received: right.clone() })
 			},
-			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: left.clone() })
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister{ val: 0, is_pointer: false }, received: left.clone() })
 		}
 	}
 
 	// Write an addition operation to the LLVM file
 	pub fn write_add(&mut self, left: &LLVMValue, right: &LLVMValue, reg: u32) -> Result<()> {
 		match left {
-			LLVMValue::VirtualRegister(l) => match right {
-				LLVMValue::VirtualRegister(r) => Ok(self.writeln(&format!("\t%{} = add nsw i32 %{}, %{}", reg, l, r))?),
-				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: right.clone() })
+			LLVMValue::VirtualRegister{ val: l, is_pointer: _ } => match right {
+				LLVMValue::VirtualRegister{ val: r, is_pointer: _ } => Ok(self.writeln(&format!("\t%{} = add nsw i32 %{}, %{}", reg, l, r))?),
+				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister{ val: 0, is_pointer: false }, received: right.clone() })
 			},
-			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: left.clone() })
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister{ val: 0, is_pointer: false }, received: left.clone() })
 		}
 	}
 
 	// Write an addition operation to the LLVM file
 	pub fn write_div(&mut self, left: &LLVMValue, right: &LLVMValue, reg: u32) -> Result<()> {
 		match left {
-			LLVMValue::VirtualRegister(l) => match right {
-				LLVMValue::VirtualRegister(r) => Ok(self.writeln(&format!("\t%{} = udiv i32 %{}, %{}", reg, l, r))?),
-				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: right.clone() })
+			LLVMValue::VirtualRegister{ val: l, is_pointer: _ } => match right {
+				LLVMValue::VirtualRegister{ val: r, is_pointer: _ } => Ok(self.writeln(&format!("\t%{} = udiv i32 %{}, %{}", reg, l, r))?),
+				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister{ val: 0, is_pointer: false }, received: right.clone() })
 			},
-			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: left.clone() })
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister{ val: 0, is_pointer: false }, received: left.clone() })
 		}
 	}
 

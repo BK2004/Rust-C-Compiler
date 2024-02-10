@@ -1,6 +1,9 @@
 #[derive(Debug, Clone)]
 pub enum LLVMValue {
-	VirtualRegister(u32),
+	VirtualRegister {
+		val: u32,
+		is_pointer: bool,
+	},
 	None
 }
 
@@ -8,7 +11,7 @@ impl std::fmt::Display for LLVMValue {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
 		match self {
 			LLVMValue::None => write!(f, "None"),
-			LLVMValue::VirtualRegister(_) => write!(f, "VirtualRegister"),
+			LLVMValue::VirtualRegister{val: _, is_pointer: _} => write!(f, "VirtualRegister"),
 		}
 	}
 }

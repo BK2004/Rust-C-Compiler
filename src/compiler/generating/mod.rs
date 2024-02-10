@@ -87,7 +87,7 @@ impl Generator {
 		match root {
 			ASTNode::Literal(Literal::Integer(_)) => {
 				self.free_register_count += 1;
-				Ok([LLVMStackEntry::new(LLVMValue::VirtualRegister(self.update_virtual_register(1)), 4)].to_vec())
+				Ok([LLVMStackEntry::new(LLVMValue::VirtualRegister{ val: self.update_virtual_register(1), is_pointer: true, }, 4)].to_vec())
 			},
 			ASTNode::Binary{token: _, left, right} => {
 				let mut left_allocs = self.determine_binary_expression_stack_allocation(&left)?;
@@ -110,12 +110,12 @@ impl Generator {
 	// Ensures registers in a list are loaded; if not, they have new registers loaded and references are updated
 	pub fn ensure_registers_loaded(&mut self, registers: &mut[&mut LLVMValue]) -> Result<()> {
 		for i in 0..registers.len() {
-			if let LLVMValue::VirtualRegister(reg_id) = registers[i] {
+			if let LLVMValue::VirtualRegister{ val, is_pointer: _ } = registers[i] {
 				let mut loaded = false;
 
 				for (__, loaded_reg) in self.loaded_registers.iter().enumerate() {
-					if let LLVMValue::VirtualRegister(loaded_reg_id) = loaded_reg {
-						if loaded_reg_id == reg_id {
+					if let LLVMValue::VirtualRegister{ val: loaded_reg_id, is_pointer } = loaded_reg {
+						if !is_pointer || loaded_reg_id == val {
 							loaded = true;
 						}
 					}
@@ -124,9 +124,9 @@ impl Generator {
 				if !loaded {
 					// If not loaded, load a new register with old one
 					let new_reg_id = self.update_virtual_register(1);
-					self.writer.write_load(*reg_id, new_reg_id)?;
+					self.writer.write_load(*val, new_reg_id)?;
 
-					*registers[i] = LLVMValue::VirtualRegister(new_reg_id);
+					*registers[i] = LLVMValue::VirtualRegister{ val: new_reg_id, is_pointer: true };
 
 					self.loaded_registers.push(registers[i].clone());
 				}
@@ -154,12 +154,12 @@ impl Generator {
 	// Print integer
 	pub fn print_int(&mut self, reg: &LLVMValue) -> Result<()> {
 		Ok(match reg {
-			LLVMValue::VirtualRegister(reg_id) => {
+			LLVMValue::VirtualRegister{val, is_pointer: _} => {
 				// Printing int returns value so register count needs to increase
 				self.update_virtual_register(1);
-				self.writer.print_int(*reg_id)
+				self.writer.print_int(*val)
 			},
-			LLVMValue::None => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: reg.clone() })
+			LLVMValue::None => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister{val: 0, is_pointer: false}, received: reg.clone() })
 		}?)
 	}
 
@@ -188,7 +188,7 @@ impl Generator {
 
 		let reg = self.update_virtual_register(1);
 		self.writer.writeln(&format!("\t%{} = add i32 {}, 0", reg, res))?;
-		self.print_int(&LLVMValue::VirtualRegister(reg))?;
+		self.print_int(&LLVMValue::VirtualRegister{ val: reg, is_pointer: true, })?;
 
 		Ok(())
 	}
@@ -199,7 +199,7 @@ impl Generator {
 		self.writer.write_literal(literal, reg)?;
 
 		match literal {
-			Literal::Integer(_) => Ok(LLVMValue::VirtualRegister(reg)),
+			Literal::Integer(_) => Ok(LLVMValue::VirtualRegister{ val: reg, is_pointer: true, }),
 		}
 	}
 
@@ -224,7 +224,7 @@ impl Generator {
 		let reg = self.update_virtual_register(1);
 		self.writer.write_mul(&left, &right, reg)?;
 
-		Ok(LLVMValue::VirtualRegister(reg))
+		Ok(LLVMValue::VirtualRegister{ val: reg, is_pointer: true, })
 	}
 
 	// Generate LLVMValue for subtraction
@@ -232,7 +232,7 @@ impl Generator {
 		let reg = self.update_virtual_register(1);
 		self.writer.write_sub(&left, &right, reg)?;
 
-		Ok(LLVMValue::VirtualRegister(reg))
+		Ok(LLVMValue::VirtualRegister{ val: reg, is_pointer: true, })
 	}
 
 	// Generate LLVMValue for addition
@@ -240,7 +240,7 @@ impl Generator {
 		let reg = self.update_virtual_register(1);
 		self.writer.write_add(&left, &right, reg)?;
 
-		Ok(LLVMValue::VirtualRegister(reg))
+		Ok(LLVMValue::VirtualRegister{ val: reg, is_pointer: true, })
 	}
 
 	// Generate LLVMValue for division
@@ -248,7 +248,7 @@ impl Generator {
 		let reg = self.update_virtual_register(1);
 		self.writer.write_div(&left, &right, reg)?;
 
-		Ok(LLVMValue::VirtualRegister(reg))
+		Ok(LLVMValue::VirtualRegister{ val: reg, is_pointer: true, })
 	}
 
 	// Interpret an AST recursively
