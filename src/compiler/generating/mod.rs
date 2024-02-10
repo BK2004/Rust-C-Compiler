@@ -1,7 +1,7 @@
 pub mod writer;
 pub mod llvm;
 
-use std::io::Result;
+use crate::error::*;
 
 use crate::parsing::ast::ASTNode;
 use crate::parsing::Parser;
@@ -29,7 +29,8 @@ impl Generator {
 
 	pub fn from_filename(filename: String) -> Result<Self> {
 		Writer::from_filename(filename)
-			.and_then(|writer| Ok(Self::new(writer)))
+			.map(|writer| Self::new(writer))
+			.map_err(|cause| Error::FileOpenError { cause })
 	}
 
 	pub fn writer(&self) -> &Writer {
@@ -158,7 +159,7 @@ impl Generator {
 				self.update_virtual_register(1);
 				self.writer.print_int(*reg_id)
 			},
-			LLVMValue::None => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected virtual register"))
+			LLVMValue::None => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: reg.clone() })
 		}?)
 	}
 
@@ -210,7 +211,7 @@ impl Generator {
 			Token::Minus => Ok(self.generate_sub(left, right)?),
 			Token::Plus => Ok(self.generate_add(left, right)?),
 			Token::Slash => Ok(self.generate_div(left, right)?),
-			_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected binary operator"))
+			_ => Err(Error::BinaryOperatorExpected { received: *token })
 		}?;
 
 		self.loaded_registers.push(out.clone());
@@ -263,7 +264,7 @@ impl Generator {
 					Token::Minus => Ok(left_res - right_res),
 					Token::Plus => Ok(left_res + right_res),
 					Token::Slash => Ok(left_res / right_res),
-					_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid token"))
+					_ => Err(Error::BinaryOperatorExpected { received: token.clone() })
 				};
 			}
 		}

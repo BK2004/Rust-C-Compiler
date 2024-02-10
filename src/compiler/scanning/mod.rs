@@ -5,7 +5,9 @@ use utf8_chars::BufReadCharsExt;
 
 use std::fmt::Debug;
 use std::fs::File;
-use std::io::{BufReader, Result};
+use std::io::BufReader;
+
+use crate::error::*;
 
 #[derive(Debug)]
 pub struct Scanner {
@@ -29,7 +31,7 @@ impl Scanner {
 	pub fn open_file(filename: String) -> Result<Self> {
 		File::open(&filename)
 			.map(|file| Self::new(filename, BufReader::new(file)))
-			.map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))
+			.map_err(|cause| Error::FileOpenError { cause })
 	}
 
 	// Put character in put backs
@@ -45,7 +47,7 @@ impl Scanner {
 		}
 
 		let next = self.file.read_char()
-			.map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error));
+			.map_err(|cause| Error::FileReadError { cause });
 
 		if let Ok(Some(c)) = next {
 			// If next is line break, add one to line counter
@@ -86,7 +88,6 @@ impl Scanner {
 			// Check if c is start of an identifier
 			if c.is_alphabetic() {
 				let identifier = self.scan_identifier(c)?;
-				println!("{identifier}");
 
 				// Search for identifier in list of identifiers; if not found, error
 				for (_, id) in IDENTIFIER_SYMBOLS.iter().enumerate() {
@@ -95,7 +96,7 @@ impl Scanner {
 					}
 				}
 
-				return Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid identifier found."));
+				return Err(Error::UnknownIdentifier { received: identifier });
 			}
 
 			// Generate possible symbols that c represents
@@ -128,7 +129,7 @@ impl Scanner {
 
 			// If possible symbols is empty, token is invalid
 			if remaining_symbols.len() == 0 {
-				Ok(Some(Token::Invalid))
+				Ok(Some(Token::None))
 			} else {
 				for (_, symbol) in remaining_symbols.iter().enumerate() {
 					if symbol.0 == curr {
@@ -136,7 +137,7 @@ impl Scanner {
 					}
 				}
 
-				Err(std::io::Error::new(std::io::ErrorKind::Other, "Failed to recognize symbol."))
+				Err(Error::UnknownToken { received: curr })
 			}
 		} else {
 			Ok(Some(Token::EndOfFile))

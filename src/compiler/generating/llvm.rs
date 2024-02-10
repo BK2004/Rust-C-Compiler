@@ -4,6 +4,15 @@ pub enum LLVMValue {
 	None
 }
 
+impl std::fmt::Display for LLVMValue {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+		match self {
+			LLVMValue::None => write!(f, "None"),
+			LLVMValue::VirtualRegister(_) => write!(f, "VirtualRegister"),
+		}
+	}
+}
+
 #[derive(Debug, Clone)]
 pub struct LLVMStackEntry {
 	register: LLVMValue,

@@ -1,4 +1,4 @@
-use std::io::Result;
+use crate::error::*;
 use crate::scanning::Scanner;
 use crate::scanning::token::*;
 use ast::*;
@@ -49,8 +49,9 @@ impl Parser {
 				return Ok(());
 			}
 		}
-		
-		Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected different token than what was received"))
+		let t: Token;
+		if let Some(tok) = self.current_token { t = tok; } else {t = Token::None};
+		Err(Error::InvalidToken { expected: tokens.to_vec(), received: t })
 	}
 
 	// Verify that current token matches an identifier and return said identifier
@@ -58,9 +59,9 @@ impl Parser {
 		match self.current_token {
 			Some(t) => match t {
 				Token::Identifier(i) => Ok(i),
-				_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected identifier")),
+				_ => Err(Error::IdentifierExpected { received: t }),
 			},
-			None => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected identifier"))
+			None => Err(Error::IdentifierExpected { received: Token::None })
 		}
 	}
 
@@ -85,25 +86,24 @@ impl Parser {
 	// Parse a terminal node, i.e. a node is created with a literal token
 	pub fn parse_terminal_node(&mut self) -> Result<ASTNode> {
 		let Some(token) = self.current_token.clone() else {
-			return Err(std::io::Error::new(std::io::ErrorKind::Other, "Terminal token expected"));
+			return Err(Error::LiteralExpected { received: Token::None });
 		};
 
 		match token {
 			Token::Literal(Literal::Integer(x)) => {self.current_token = self.scanner.scan()?; Ok(ASTNode::Literal(Literal::Integer(x)))},
-			_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected literal"))
+			_ => Err(Error::LiteralExpected { received: token })
 		}
 	}
 
 	// Get precedence of token or error if not a valid operator
 	pub fn get_precedence(&self, token: &Token) -> Result<u8> {
-		dbg!(token);
 		// Search precedence array for token, else invalid token
 		for (_, prec) in OPERATOR_PRECEDENCE.iter().enumerate() {
 			if prec.0 == *token {
 				return Ok(prec.1);
 			}
 		}
-		Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected token with precedence"))
+		Err(Error::BinaryOperatorExpected { received: *token })
 	}
 
 	pub fn parse_binary_operation(&mut self, prev: u8) -> Result<ASTNode> {
@@ -114,11 +114,11 @@ impl Parser {
 
 		match &self.current_token {
 			Some(t) => { token = t.clone(); },
-			None => { return Err(std::io::Error::new(std::io::ErrorKind::Other, "Token expected, got None")); }
+			None => { return Err(Error::BinaryOperatorExpected { received: Token::None }); }
 		}
 
 		if let Token::EndOfFile = token {
-			return Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected ';'. reached EOF"));
+			return Err(Error::InvalidToken { expected: [Token::Semicolon].to_vec(), received: Token::EndOfFile });
 		} else if let Token::Semicolon = token {
 			return Ok(left);
 		}
@@ -142,7 +142,7 @@ impl Parser {
 
 			match &self.current_token {
 				Some(t) => { token = t.clone(); },
-				None => { return Err(std::io::Error::new(std::io::ErrorKind::Other, "Token expected, got None")); }
+				None => { return Err(Error::BinaryOperatorExpected { received: Token::None }); }
 			}
 		}
 

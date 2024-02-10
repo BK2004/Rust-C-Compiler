@@ -1,5 +1,5 @@
 use clap::Parser;
-use std::io::Result;
+use crate::error::*;
 
 #[derive(Debug, Parser)]
 #[command(author, version)]

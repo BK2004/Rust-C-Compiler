@@ -1,6 +1,7 @@
 use std::fs::File;
-use std::io::{Result, Write};
+use std::io::Write;
 
+use crate::error::*;
 use crate::generating::llvm::{LLVMStackEntry, LLVMValue};
 use crate::scanning::token::Literal;
 
@@ -18,9 +19,10 @@ impl Writer {
 		}
 	}
 
-	pub fn from_filename(filename: String) -> Result<Self> {
+	pub fn from_filename(filename: String) -> std::io::Result<Self> {
 		File::create(&filename)
-			.and_then(|file| Ok(Self::new(filename.clone(), file)))
+			.map(|file| Ok(Self::new(filename.clone(), file)))
+			.map_err(|cause| cause)?
 	}
 
 	pub fn write_preamble(&mut self) -> Result<()> {
@@ -67,7 +69,7 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 		if let LLVMValue::VirtualRegister(reg) = stack_entry.register() {
 			self.writeln(&format!("\t%{} = alloca i32, align {}", reg, stack_entry.align_bytes()))
 		} else {
-			Err(std::io::Error::new(std::io::ErrorKind::Other, "VirtualRegister expected."))
+			Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: stack_entry.register().clone() })
 		}
 	}
 
@@ -92,9 +94,9 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 		match left {
 			LLVMValue::VirtualRegister(l) => match right {
 				LLVMValue::VirtualRegister(r) => Ok(self.writeln(&format!("\t%{} = mul nsw i32 %{}, %{}", reg, l, r))?),
-				_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected virtual register"))
+				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: right.clone() })
 			},
-			_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected virtual register"))
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: left.clone() })
 		}
 	}
 
@@ -103,9 +105,9 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 		match left {
 			LLVMValue::VirtualRegister(l) => match right {
 				LLVMValue::VirtualRegister(r) => Ok(self.writeln(&format!("\t%{} = sub nsw i32 %{}, %{}", reg, l, r))?),
-				_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected virtual register"))
+				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: right.clone() })
 			},
-			_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected virtual register"))
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: left.clone() })
 		}
 	}
 
@@ -114,9 +116,9 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 		match left {
 			LLVMValue::VirtualRegister(l) => match right {
 				LLVMValue::VirtualRegister(r) => Ok(self.writeln(&format!("\t%{} = add nsw i32 %{}, %{}", reg, l, r))?),
-				_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected virtual register"))
+				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: right.clone() })
 			},
-			_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected virtual register"))
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: left.clone() })
 		}
 	}
 
@@ -125,9 +127,9 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 		match left {
 			LLVMValue::VirtualRegister(l) => match right {
 				LLVMValue::VirtualRegister(r) => Ok(self.writeln(&format!("\t%{} = udiv i32 %{}, %{}", reg, l, r))?),
-				_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected virtual register"))
+				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: right.clone() })
 			},
-			_ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Expected virtual register"))
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(2), received: left.clone() })
 		}
 	}
 
@@ -139,13 +141,13 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 	pub fn write(&mut self, msg: &str) -> Result<()> {
 		self.target.write(msg.as_bytes())
 			.map(|_| Ok(()))
-			.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?
+			.map_err(|cause| Error::FileWriteError { cause })?
 	}
 
 	pub fn writeln(&mut self, msg: &str) -> Result<()> {
 		self.target.write((msg.to_owned() + "\n").as_bytes())
 			.map(|_| Ok(()))
-			.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?
+			.map_err(|cause| Error::FileWriteError { cause })?
 	}
 
 }
