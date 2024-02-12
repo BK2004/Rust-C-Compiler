@@ -17,6 +17,7 @@ pub enum Error {
 	LiteralExpected { received: Token },
 	UnexpectedEOF { expected: Token },
 	UnexpectedLLVMValue { expected: LLVMValue, received: LLVMValue },
+	StringParseError { cause: std::num::ParseIntError },
 }
 
 impl fmt::Display for Error {
@@ -43,6 +44,7 @@ impl fmt::Display for Error {
 			Error::LiteralExpected { received } => write!(f, "LiteralExpected: Expected a Literal, but received {received}"),
 			Error::UnexpectedEOF { expected } => write!(f, "UnexpectedEOF: Expected {expected}, but reached EOF"),
 			Error::UnexpectedLLVMValue { expected, received } => write!(f, "UnexpectedLLVMValue: Expected a {expected}, but received {received}"),
+			Error::StringParseError { cause } => write!(f, "StringParseError: {cause}")
 		}
 	}
 }

@@ -87,7 +87,7 @@ impl Generator {
 		match root {
 			ASTNode::Literal(Literal::Integer(_)) => {
 				self.free_register_count += 1;
-				Ok([LLVMStackEntry::new(LLVMValue::VirtualRegister{ val: self.update_virtual_register(1), is_pointer: true, }, 4)].to_vec())
+				Ok([LLVMStackEntry::new(LLVMValue::VirtualRegister(VirtualRegister::new(self.update_virtual_register(1).to_string(), RegisterFormat::Integer)), 4)].to_vec())
 			},
 			ASTNode::Binary{token: _, left, right} => {
 				let mut left_allocs = self.determine_binary_expression_stack_allocation(&left)?;
@@ -110,12 +110,12 @@ impl Generator {
 	// Ensures registers in a list are loaded; if not, they have new registers loaded and references are updated
 	pub fn ensure_registers_loaded(&mut self, registers: &mut[&mut LLVMValue]) -> Result<()> {
 		for i in 0..registers.len() {
-			if let LLVMValue::VirtualRegister{ val, is_pointer: _ } = registers[i] {
+			if let LLVMValue::VirtualRegister(reg) = registers[i] {
 				let mut loaded = false;
 
 				for (__, loaded_reg) in self.loaded_registers.iter().enumerate() {
-					if let LLVMValue::VirtualRegister{ val: loaded_reg_id, is_pointer } = loaded_reg {
-						if !is_pointer || loaded_reg_id == val {
+					if let LLVMValue::VirtualRegister(check) = loaded_reg {
+						if reg.id() == check.id() {
 							loaded = true;
 						}
 					}
@@ -124,9 +124,10 @@ impl Generator {
 				if !loaded {
 					// If not loaded, load a new register with old one
 					let new_reg_id = self.update_virtual_register(1);
-					self.writer.write_load(*val, new_reg_id)?;
+					;
+					self.writer.write_load(reg.id().parse().map_err(|cause| Error::StringParseError { cause })?, new_reg_id)?;
 
-					*registers[i] = LLVMValue::VirtualRegister{ val: new_reg_id, is_pointer: true };
+					*registers[i] = LLVMValue::VirtualRegister(VirtualRegister::new(new_reg_id.to_string(), RegisterFormat::Integer));
 
 					self.loaded_registers.push(registers[i].clone());
 				}
@@ -154,12 +155,13 @@ impl Generator {
 	// Print integer
 	pub fn print_int(&mut self, reg: &LLVMValue) -> Result<()> {
 		Ok(match reg {
-			LLVMValue::VirtualRegister{val, is_pointer: _} => {
+			LLVMValue::VirtualRegister(reg) => {
 				// Printing int returns value so register count needs to increase
 				self.update_virtual_register(1);
-				self.writer.print_int(*val)
+				self.writer.print_int(reg.id().parse().map_err(|cause| Error::StringParseError { cause })?)
 			},
-			LLVMValue::None => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister{val: 0, is_pointer: false}, received: reg.clone() })
+			LLVMValue::Constant(Constant::Integer(x)) => self.writer.print_int(*x as u32),
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: reg.clone() })
 		}?)
 	}
 
@@ -188,7 +190,7 @@ impl Generator {
 
 		let reg = self.update_virtual_register(1);
 		self.writer.writeln(&format!("\t%{} = add i32 {}, 0", reg, res))?;
-		self.print_int(&LLVMValue::VirtualRegister{ val: reg, is_pointer: true, })?;
+		self.print_int(&LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer)))?;
 
 		Ok(())
 	}
@@ -199,7 +201,7 @@ impl Generator {
 		self.writer.write_literal(literal, reg)?;
 
 		match literal {
-			Literal::Integer(_) => Ok(LLVMValue::VirtualRegister{ val: reg, is_pointer: true, }),
+			Literal::Integer(_) => Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer))),
 		}
 	}
 
@@ -224,7 +226,7 @@ impl Generator {
 		let reg = self.update_virtual_register(1);
 		self.writer.write_mul(&left, &right, reg)?;
 
-		Ok(LLVMValue::VirtualRegister{ val: reg, is_pointer: true, })
+		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer)))
 	}
 
 	// Generate LLVMValue for subtraction
@@ -232,7 +234,7 @@ impl Generator {
 		let reg = self.update_virtual_register(1);
 		self.writer.write_sub(&left, &right, reg)?;
 
-		Ok(LLVMValue::VirtualRegister{ val: reg, is_pointer: true, })
+		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer)))
 	}
 
 	// Generate LLVMValue for addition
@@ -240,7 +242,7 @@ impl Generator {
 		let reg = self.update_virtual_register(1);
 		self.writer.write_add(&left, &right, reg)?;
 
-		Ok(LLVMValue::VirtualRegister{ val: reg, is_pointer: true, })
+		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer)))
 	}
 
 	// Generate LLVMValue for division
@@ -248,7 +250,7 @@ impl Generator {
 		let reg = self.update_virtual_register(1);
 		self.writer.write_div(&left, &right, reg)?;
 
-		Ok(LLVMValue::VirtualRegister{ val: reg, is_pointer: true, })
+		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer)))
 	}
 
 	// Interpret an AST recursively
