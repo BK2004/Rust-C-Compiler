@@ -1,6 +1,6 @@
 use std::{fmt, result};
 
-use crate::scanning::token::Token;
+use crate::scanning::token::{Identifier, Token};
 use crate::generating::llvm::LLVMValue;
 
 pub type Result<T> = result::Result<T, Error>;
@@ -10,6 +10,8 @@ pub enum Error {
 	FileReadError { cause: std::io::Error },
 	FileWriteError { cause: std::io::Error },
 	InvalidToken { expected: Vec<Token>, received: Token },
+	InvalidIdentifier { expected: Vec<Identifier>, received: Identifier },
+	TerminalTokenExpected { received_token: Option<Token>, received_identifier: Option<Identifier> },
 	UnknownToken { received: String },
 	UnknownIdentifier { received: String },
 	BinaryOperatorExpected { received: Token},
@@ -18,6 +20,10 @@ pub enum Error {
 	UnexpectedEOF { expected: Token },
 	UnexpectedLLVMValue { expected: LLVMValue, received: LLVMValue },
 	StringParseError { cause: std::num::ParseIntError },
+	SymbolUndefined { name: String },
+	SymbolDeclared { name: String },
+	StatementExpected,
+	ExpressionExpected,
 }
 
 impl fmt::Display for Error {
@@ -35,6 +41,27 @@ impl fmt::Display for Error {
 					}
 				}
 
+				if expected.len() > 1 {
+					expected_concat.insert(0, '[');
+					expected_concat.push(']');
+				}
+
+				write!(f, "InvalidToken: Expected {expected_concat}; got {received}")
+			},
+			Error::InvalidIdentifier { expected, received } => {
+				let mut expected_concat = String::from("");
+				for (i, id) in expected.iter().enumerate() {
+					expected_concat += &format!("{id}");
+					if i < expected.len() - 1 {
+						expected_concat += ", ";
+					}
+				}
+
+				if expected.len() > 1 {
+					expected_concat.insert(0, '[');
+					expected_concat.push(']');
+				}
+
 				write!(f, "InvalidToken: Expected {expected_concat}; got {received}")
 			},
 			Error::UnknownToken { received } => write!(f, "UnknownToken: {received}"),
@@ -44,7 +71,20 @@ impl fmt::Display for Error {
 			Error::LiteralExpected { received } => write!(f, "LiteralExpected: Expected a Literal, but received {received}"),
 			Error::UnexpectedEOF { expected } => write!(f, "UnexpectedEOF: Expected {expected}, but reached EOF"),
 			Error::UnexpectedLLVMValue { expected, received } => write!(f, "UnexpectedLLVMValue: Expected a {expected}, but received {received}"),
-			Error::StringParseError { cause } => write!(f, "StringParseError: {cause}")
+			Error::StringParseError { cause } => write!(f, "StringParseError: {cause}"),
+			Error::SymbolUndefined { name } => write!(f, "SymbolUndefined: '{name}'"),
+			Error::SymbolDeclared { name } => write!(f, "SymbolDeclared: Symbol {name} has already been declared"),
+			Error::StatementExpected => write!(f, "StatementExpected: A statement was expected"),
+			Error::ExpressionExpected => write!(f, "ExpressionExpected: An expression was expected"),
+			Error::TerminalTokenExpected { received_token, received_identifier } => {
+				if let Some(t) = received_token {
+					write!(f, "TerminalTokenExpected: Expected a terminal token, but got {t} instead")
+				} else if let Some(i) = received_identifier {
+					write!(f, "TerminalTokenExpected: Expected a terminal token, but got {i} instead")
+				} else {
+					write!(f, "TerminalTOkenExpected")
+				}
+			}
 		}
 	}
 }

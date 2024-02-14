@@ -2,10 +2,9 @@ use std::fs::File;
 use std::io::Write;
 
 use crate::error::*;
-use crate::generating::llvm::{LLVMStackEntry, LLVMValue};
-use crate::scanning::token::Literal;
+use crate::generating::llvm::LLVMValue;
 
-use super::{RegisterFormat, VirtualRegister};
+use super::{Constant, RegisterFormat, VirtualRegister};
 
 #[derive(Debug)]
 pub struct Writer {
@@ -66,78 +65,92 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 		)
 	}
 
-	// Write an allocation to the LLVM file (only implemented for i32 as of now)
-	pub fn write_alloc(&mut self, stack_entry: &LLVMStackEntry) -> Result<()> {
-		if let LLVMValue::VirtualRegister(reg) = stack_entry.register() {
-			self.writeln(&format!("\t%{} = alloca i32, align {}", reg.id(), stack_entry.align_bytes()))
-		} else {
-			Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: stack_entry.register().clone() })
-		}
+	// Allocate space for local variable
+	pub fn write_local_alloc(&mut self, register: &VirtualRegister) -> Result<()> {
+		self.writeln(&format!("\t{register} = alloca i32"))
 	}
 
-	// Write a literal to the LLVM file (store it at given reg)
-	pub fn write_literal(&mut self, literal: &Literal, reg: u32) -> Result<()> {
-		match literal {
-			Literal::Integer(x) => self.writeln(&format!("\tstore i32 {}, i32* %{}", x, reg))?
-		}
-
-		Ok(())
+	// Load src register into target
+	pub fn write_load(&mut self, src: &LLVMValue, trg: &LLVMValue) -> Result<()> {
+		self.writeln(&format!("\t{trg} = load i32, i32* {src}"))
 	}
 
-	// Write a load statement to the LLVM file (Move stored i32 pointer to i32)
-	pub fn write_load(&mut self, old_reg: u32, new_reg: u32) -> Result<()> {
-		self.writeln(&format!("\t%{} = load i32, i32* %{}", new_reg, old_reg))?;
-
-		Ok(())
+	// Store value in register
+	pub fn write_store(&mut self, src: &LLVMValue, trg: &LLVMValue) -> Result<()> {
+		self.writeln(&format!("\tstore i32 {src}, i32* {trg}"))
 	}
 
 	// Write a multiplication to the LLVM file
 	pub fn write_mul(&mut self, left: &LLVMValue, right: &LLVMValue, reg: u32) -> Result<()> {
-		match left {
-			LLVMValue::VirtualRegister(l) => match right {
-				LLVMValue::VirtualRegister(r) => Ok(self.writeln(&format!("\t%{} = mul nsw i32 {}, {}", reg, l, r))?),
-				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: right.clone() })
-			},
+		let l_val: String = match left {
+			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
+			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
 			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
-		}
+		}?;
+
+		let r_val: String = match right {
+			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
+			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
+		}?;
+
+		self.writeln(&format!("\t%{reg} = mul nsw i32 {l_val}, {r_val}"))
 	}
 
 	// Write a subtraction operation to the LLVM file
 	pub fn write_sub(&mut self, left: &LLVMValue, right: &LLVMValue, reg: u32) -> Result<()> {
-		match left {
-			LLVMValue::VirtualRegister(l) => match right {
-				LLVMValue::VirtualRegister(r) => Ok(self.writeln(&format!("\t%{} = sub nsw i32 {}, {}", reg, l, r))?),
-				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: right.clone() })
-			},
+		let l_val: String = match left {
+			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
+			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
 			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
-		}
+		}?;
+
+		let r_val: String = match right {
+			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
+			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
+		}?;
+
+		self.writeln(&format!("\t%{reg} = sub nsw i32 {l_val}, {r_val}"))
 	}
 
 	// Write an addition operation to the LLVM file
 	pub fn write_add(&mut self, left: &LLVMValue, right: &LLVMValue, reg: u32) -> Result<()> {
-		match left {
-			LLVMValue::VirtualRegister(l) => match right {
-				LLVMValue::VirtualRegister(r) => Ok(self.writeln(&format!("\t%{} = add nsw i32 {}, {}", reg, l, r))?),
-				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: right.clone() })
-			},
+		let l_val: String = match left {
+			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
+			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
 			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
-		}
+		}?;
+
+		let r_val: String = match right {
+			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
+			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
+		}?;
+
+		self.writeln(&format!("\t%{reg} = add nsw i32 {l_val}, {r_val}"))
 	}
 
 	// Write an addition operation to the LLVM file
 	pub fn write_div(&mut self, left: &LLVMValue, right: &LLVMValue, reg: u32) -> Result<()> {
-		match left {
-			LLVMValue::VirtualRegister(l) => match right {
-				LLVMValue::VirtualRegister(r) => Ok(self.writeln(&format!("\t%{} = udiv i32 {}, {}", reg, l, r))?),
-				_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: right.clone() })
-			},
+		let l_val: String = match left {
+			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
+			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
 			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
-		}
+		}?;
+
+		let r_val: String = match right {
+			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
+			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
+		}?;
+
+		self.writeln(&format!("\t%{reg} = udiv i32 {l_val}, {r_val}"))
 	}
 
 	// Print integer (i32)
-	pub fn print_int(&mut self, reg: u32) -> Result<()> {
-		self.writeln(&format!("\tcall i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i32 %{})", reg))
+	pub fn write_print(&mut self, val: &LLVMValue) -> Result<()> {
+		self.writeln(&format!("\tcall i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i32 {val})"))
 	}
 
 	pub fn write(&mut self, msg: &str) -> Result<()> {

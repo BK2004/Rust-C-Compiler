@@ -92,11 +92,11 @@ impl Scanner {
 				// Search for identifier in list of identifiers; if not found, error
 				for (_, id) in IDENTIFIER_SYMBOLS.iter().enumerate() {
 					if identifier.eq(id.0) {
-						return Ok(Some(Token::Identifier(id.1)));
+						return Ok(Some(Token::Literal(Literal::Identifier(id.1.clone()))));
 					}
 				}
 
-				return Err(Error::UnknownIdentifier { received: identifier });
+				return Ok(Some(Token::Literal(Literal::Identifier(Identifier::Symbol(identifier)))));
 			}
 
 			// Generate possible symbols that c represents

@@ -38,27 +38,29 @@ impl Parser {
 	}
 
 	// Verify that token matches what is expected
-	pub fn match_token(&mut self, tokens: &[Token]) -> Result<()> {
+	pub fn match_token(&mut self, tokens: &[Token]) -> Result<Token> {
 		for (_, token) in tokens.iter().enumerate() {
-			let matched = match self.current_token {
+			let matched = match self.current_token.clone() {
 				Some(t) => *token == t,
 				None => false,
 			};
 
 			if matched {
-				return Ok(());
+				return Ok(self.current_token.clone().unwrap());
 			}
 		}
+
+		// Error handling
 		let t: Token;
-		if let Some(tok) = self.current_token { t = tok; } else {t = Token::None};
+		if let Some(tok) = self.current_token.clone() { t = tok; } else {t = Token::None};
 		Err(Error::InvalidToken { expected: tokens.to_vec(), received: t })
 	}
 
 	// Verify that current token matches an identifier and return said identifier
 	pub fn match_identifier(&mut self) -> Result<Identifier> {
-		match self.current_token {
+		match self.current_token.clone() {
 			Some(t) => match t {
-				Token::Identifier(i) => Ok(i),
+				Token::Literal(Literal::Identifier(i)) => Ok(i),
 				_ => Err(Error::IdentifierExpected { received: t }),
 			},
 			None => Err(Error::IdentifierExpected { received: Token::None })
@@ -66,21 +68,57 @@ impl Parser {
 	}
 
 	// Parse a statement, which for now contains an identifier followed by a binary expression followed by a semicolon
-	pub fn parse_statement(&mut self) -> Result<Option<(Identifier, ASTNode)>> {
-		// If EOL, None should be returned
+	pub fn parse_statement(&mut self) -> Result<Option<ASTNode>> {
+		// If EOF, None should be returned
 		if let Some(Token::EndOfFile) = self.current_token {
 			return Ok(None)
 		}
 
-		// Statement should follow the pattern "<print> <binary_expr> ;"
+		// Statement should follow the pattern "<identifier> <binary_expr> ;"
 		let identifier = self.match_identifier()?;
 		self.scan_next()?;
 
-		let binary_node = self.parse_binary_operation(0)?;
-		self.match_token(&[Token::Semicolon])?;
-		self.scan_next()?;
+		Ok(Some(match identifier {
+			Identifier::Print => {
+				Ok(ASTNode::Print {
+					expr: {
+						let b = Box::new(self.parse_binary_operation(0)?);
+						self.match_token(&[Token::Semicolon])?;
+						self.scan_next()?;
 
-		Ok(Some((identifier, binary_node)))
+						b
+					}
+				})
+			},
+			Identifier::Let => {
+				// Let should be formatted as either 'let <symbol> = <value>;' or 'let <symbol>;'
+				let id = self.match_identifier()?;
+				self.scan_next()?;
+
+				match id {
+					Identifier::Symbol(symbol) => {
+						let eq_or_semi = self.match_token(&[Token::Equals, Token::Semicolon])?;
+						self.scan_next()?;
+
+						// If eq_or_semi is Equals, assigment should occur in the same line; else, statement ends on semicolon
+						match eq_or_semi {
+							Token::Equals => {
+								let val = Some(Box::new(self.parse_binary_operation(0)?));
+								self.match_token(&[Token::Semicolon])?;
+								self.scan_next()?;
+								Ok(ASTNode::Let {
+									name: symbol,
+									value: val
+								})
+							},
+							_ => Ok(ASTNode::Let { name: symbol, value: None })
+						}
+					},
+					_ => Err(Error::InvalidIdentifier { expected: [Identifier::Symbol("".to_string())].to_vec(), received: id })
+				}
+			},
+			_ => Err(Error::InvalidIdentifier { received: identifier, expected: [Identifier::Print, Identifier::Let].to_vec() }),
+		}?))
 	}
 
 	// Parse a terminal node, i.e. a node is created with a literal token
@@ -89,8 +127,11 @@ impl Parser {
 			return Err(Error::LiteralExpected { received: Token::None });
 		};
 
+		dbg!(&token);
+
 		match token {
 			Token::Literal(Literal::Integer(x)) => {self.current_token = self.scanner.scan()?; Ok(ASTNode::Literal(Literal::Integer(x)))},
+			Token::Literal(Literal::Identifier(Identifier::Symbol(c))) => {self.scan_next()?; Ok(ASTNode::Literal(Literal::Identifier(Identifier::Symbol(c))))}
 			_ => Err(Error::LiteralExpected { received: token })
 		}
 	}
@@ -103,7 +144,7 @@ impl Parser {
 				return Ok(prec.1);
 			}
 		}
-		Err(Error::BinaryOperatorExpected { received: *token })
+		Err(Error::BinaryOperatorExpected { received: token.clone() })
 	}
 
 	pub fn parse_binary_operation(&mut self, prev: u8) -> Result<ASTNode> {
@@ -131,7 +172,7 @@ impl Parser {
 			right = self.parse_binary_operation(self.get_precedence(&token)?)?;
 
 			// Join left and right into parent node connected by operator token
-			left = ASTNode::Binary { token: token.clone(), left: Box::new(left), right: Box::new(right), };
+			left = ASTNode::Binary { token: token.clone(), left: Box::new(left), right: Box::new(right) };
 
 			// If EOF reached, return the new left
 			if let Some(Token::EndOfFile) = self.current_token {

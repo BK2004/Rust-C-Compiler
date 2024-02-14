@@ -12,9 +12,9 @@ use writer::Writer;
 #[derive(Debug)]
 pub struct Generator {
 	writer: Writer,
-	loaded_registers: Vec<LLVMValue>,
 	next_register: u32,
 	free_register_count: u32,
+	symbol_table: SymbolTable,
 }
 
 impl Generator {
@@ -23,7 +23,7 @@ impl Generator {
 			writer,
 			next_register: 1,
 			free_register_count: 0,
-			loaded_registers: Vec::new(),
+			symbol_table: SymbolTable::new(64),
 		}
 	}
 
@@ -47,20 +47,8 @@ impl Generator {
 		// Allocate variable stack space and write to output
 		while let Some(statement) = parser.parse_statement()? {
 			self.free_register_count = self.next_register - 1;
-			let alloc_list = self.determine_binary_expression_stack_allocation(&statement.1)?;
-			self.allocate_stack(alloc_list)?;
 
-			let mut root = self.ast_to_llvm(&statement.1)?;
-			self.ensure_registers_loaded(&mut[&mut root])?;
-
-			match statement.0 {
-				Identifier::Print => {
-					self.print_int(&root)?;
-				},
-				Identifier::Pascal => {
-					self.pascal(self.interpret_ast(&statement.1)? as u32)?;
-				}
-			};
+			self.ast_to_llvm(&statement)?;
 		}
 
 		self.writer.write_postamble()?;
@@ -82,61 +70,6 @@ impl Generator {
 		self.free_register_count + 1
 	}
 
-	// Determines stack allocations for expression
-	pub fn determine_binary_expression_stack_allocation(&mut self, root: &ASTNode) -> Result<Vec<LLVMStackEntry>> {
-		match root {
-			ASTNode::Literal(Literal::Integer(_)) => {
-				self.free_register_count += 1;
-				Ok([LLVMStackEntry::new(LLVMValue::VirtualRegister(VirtualRegister::new(self.update_virtual_register(1).to_string(), RegisterFormat::Integer)), 4)].to_vec())
-			},
-			ASTNode::Binary{token: _, left, right} => {
-				let mut left_allocs = self.determine_binary_expression_stack_allocation(&left)?;
-				left_allocs.append(&mut self.determine_binary_expression_stack_allocation(&right)?);
-
-				return Ok(left_allocs);
-			}
-		}
-	}
-
-	// Allocates stack space given list of stack entries
-	pub fn allocate_stack(&mut self, entries: Vec<LLVMStackEntry>) -> Result<()> {
-		for (_, entry) in entries.iter().enumerate() {
-			self.writer.write_alloc(entry)?;
-		}
-
-		Ok(())
-	}
-
-	// Ensures registers in a list are loaded; if not, they have new registers loaded and references are updated
-	pub fn ensure_registers_loaded(&mut self, registers: &mut[&mut LLVMValue]) -> Result<()> {
-		for i in 0..registers.len() {
-			if let LLVMValue::VirtualRegister(reg) = registers[i] {
-				let mut loaded = false;
-
-				for (__, loaded_reg) in self.loaded_registers.iter().enumerate() {
-					if let LLVMValue::VirtualRegister(check) = loaded_reg {
-						if reg.id() == check.id() {
-							loaded = true;
-						}
-					}
-				}
-
-				if !loaded {
-					// If not loaded, load a new register with old one
-					let new_reg_id = self.update_virtual_register(1);
-					;
-					self.writer.write_load(reg.id().parse().map_err(|cause| Error::StringParseError { cause })?, new_reg_id)?;
-
-					*registers[i] = LLVMValue::VirtualRegister(VirtualRegister::new(new_reg_id.to_string(), RegisterFormat::Integer));
-
-					self.loaded_registers.push(registers[i].clone());
-				}
-			}
-		}
-
-		Ok(())
-	}
-
 	// Traverse AST and generate LLVM for the tree
 	pub fn ast_to_llvm(&mut self, root: &ASTNode) -> Result<LLVMValue> {
 		match root {
@@ -147,76 +80,35 @@ impl Generator {
 				let right_llvm = self.ast_to_llvm(&right)?;
 
 				return Ok(self.generate_binary(token, left_llvm, right_llvm)?);
-			}
-		}
-
-	}
-
-	// Print integer
-	pub fn print_int(&mut self, reg: &LLVMValue) -> Result<()> {
-		Ok(match reg {
-			LLVMValue::VirtualRegister(reg) => {
-				// Printing int returns value so register count needs to increase
-				self.update_virtual_register(1);
-				self.writer.print_int(reg.id().parse().map_err(|cause| Error::StringParseError { cause })?)
 			},
-			LLVMValue::Constant(Constant::Integer(x)) => self.writer.print_int(*x as u32),
-			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: reg.clone() })
-		}?)
-	}
-
-	// Calculate nth row of Pascal's triangle
-	pub fn pascal(&mut self, n: u32) -> Result<()> {
-		let mut res: u32 = 0;
-
-		let mut n_fact = 1;
-		for i in 1..n+1 {
-			n_fact *= i;
+			ASTNode::Let { name, value } => Ok(self.generate_let(name, value)?),
+			ASTNode::Print { expr } => Ok(self.generate_print(expr)?),
 		}
 
-		for i in 0..n+1 {
-			let mut r_fact = 1;
-			for j in 1..i+1 {
-				r_fact *= j;
-			}
-
-			let mut n_minus_r_fact = 1;
-			for j in 1..(n-i+1) {
-				n_minus_r_fact *= j;
-			}
-
-			res += n_fact / (r_fact * n_minus_r_fact);
-		}
-
-		let reg = self.update_virtual_register(1);
-		self.writer.writeln(&format!("\t%{} = add i32 {}, 0", reg, res))?;
-		self.print_int(&LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer)))?;
-
-		Ok(())
 	}
 
-	// Generate constant given literal
+	// Generate literal value based on given type
 	pub fn generate_literal(&mut self, literal: &Literal) -> Result<LLVMValue> {
-		let reg = self.claim_free_register();
-		self.writer.write_literal(literal, reg)?;
-
 		match literal {
-			Literal::Integer(_) => Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer))),
+			Literal::Integer(x) => Ok(LLVMValue::Constant(Constant::Integer(*x))),
+			Literal::Identifier(i) => match i {
+				Identifier::Symbol(x) => Ok(LLVMValue::VirtualRegister(VirtualRegister::new(x.to_owned(), RegisterFormat::Identifier))),
+				_ => Err(Error::TerminalTokenExpected { received_token: None, received_identifier: Some(i.clone()) })
+			},
 		}
 	}
 
 	// Generate binary statement given operation and left/right LLVMValues
 	pub fn generate_binary(&mut self, token: &Token, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
-		self.ensure_registers_loaded(&mut[&mut left, &mut right])?;
+		self.ensure_literals(&mut[&mut left, &mut right])?;
+
 		let out = match token {
 			Token::Asterisk => Ok(self.generate_mul(left, right)?),
 			Token::Minus => Ok(self.generate_sub(left, right)?),
 			Token::Plus => Ok(self.generate_add(left, right)?),
 			Token::Slash => Ok(self.generate_div(left, right)?),
-			_ => Err(Error::BinaryOperatorExpected { received: *token })
+			_ => Err(Error::BinaryOperatorExpected { received: token.clone() })
 		}?;
-
-		self.loaded_registers.push(out.clone());
 
 		Ok(out)
 	}
@@ -253,11 +145,79 @@ impl Generator {
 		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer)))
 	}
 
+	pub fn generate_let(&mut self, name: &String, value: &Option<Box<ASTNode>>) -> Result<LLVMValue> {
+		if let Ok(_) = self.symbol_table.get(name) {
+			return Err(Error::SymbolDeclared { name: name.to_owned() });
+		}
+
+		// Write an allocate statement; if there is a value given, then store that value in the local variable
+		let (symbol, reg) = self.symbol_table.create_local(name, &RegisterFormat::Integer);
+		self.writer.write_local_alloc(&reg)?;
+
+		if let Some(val) = value {
+			let assigned_llvm = self.ast_to_llvm(&val)?;
+
+			self.writer.write_store(&assigned_llvm, &LLVMValue::VirtualRegister(reg))?;
+		}
+
+		self.symbol_table.insert(symbol);
+
+		Ok(LLVMValue::None)
+	}
+
+	// Generate print statement
+	pub fn generate_print(&mut self, expr: &ASTNode) -> Result<LLVMValue> {
+		let val = self.ast_to_llvm(expr)?;
+		
+		if let LLVMValue::None = val {
+			return Err(Error::ExpressionExpected)
+		}
+
+		self.writer.write_print(&val)?;
+
+		Ok(LLVMValue::None)
+	}
+
+	pub fn load_numbered_register(&mut self, val: LLVMValue) -> Result<LLVMValue> {
+		if let LLVMValue::VirtualRegister(_) = &val {
+			let reg = self.update_virtual_register(1);
+			let reg_val = LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer));
+
+			self.writer.write_load(&val.clone(), &reg_val)?;
+
+			Ok(reg_val)
+		} else {
+			Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: val })
+		}
+	}
+
+	// Ensure that given LLVM Values are in operatable form
+	pub fn ensure_literals(&mut self, nodes: &mut [&mut LLVMValue]) -> Result<()> {
+		for (_, val) in nodes.iter_mut().enumerate() {
+			match val {
+				LLVMValue::None => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::Constant(Constant::Integer(3)), received: val.clone() }),
+				LLVMValue::VirtualRegister(r) => {
+					match r.format() {
+						RegisterFormat::Integer => Ok(()),
+						RegisterFormat::Identifier => {
+							**val = self.load_numbered_register(val.clone())?;
+
+							Ok(())
+						}
+					}
+				},
+				_ => Ok(())
+			}?;
+		}
+
+		Ok(())
+	}
+
 	// Interpret an AST recursively
 	pub fn interpret_ast(&self, node: &crate::parsing::ast::ASTNode) -> Result<i32> {
 		match node {
-			crate::parsing::ast::ASTNode::Literal(Literal::Integer(x)) => Ok(*x),
-			crate::parsing::ast::ASTNode::Binary{token, left, right} => {
+			ASTNode::Literal(Literal::Integer(x)) => Ok(*x),
+			ASTNode::Binary{token, left, right} => {
 				let left_res = self.interpret_ast(&left)?;
 				let right_res = self.interpret_ast(&right)?;
 	
@@ -268,7 +228,8 @@ impl Generator {
 					Token::Slash => Ok(left_res / right_res),
 					_ => Err(Error::BinaryOperatorExpected { received: token.clone() })
 				};
-			}
+			},
+			_ => Err(Error::UnexpectedEOF { expected: Token::Semicolon }) // interpreter is solely for the purpose of binary expressions
 		}
 	}
 }

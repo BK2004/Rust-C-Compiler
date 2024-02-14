@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone, Copy, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub enum Token {
 	EndOfFile,
 	None,
@@ -10,7 +10,7 @@ pub enum Token {
 	Asterisk,
 	Slash,
 	Semicolon,
-	Identifier(Identifier),
+	Equals,
 }
 
 impl fmt::Display for Token {
@@ -24,25 +24,37 @@ impl fmt::Display for Token {
 			Token::Asterisk => write!(f, "*"),
 			Token::Slash => write!(f, "/"),
 			Token::Semicolon => write!(f, ";"),
-			Token::Identifier(_) => write!(f, "Identifier"),
+			Token::Equals => write!(f, "="),
 		}
 	}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Identifier {
+	Let,
 	Print,
-	Pascal,
+	Symbol(String),
+}
+
+impl fmt::Display for Identifier {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+		match self {
+			Identifier::Print => write!(f, "print"),
+			Identifier::Let => write!(f, "let"),
+			Identifier::Symbol(s) => write!(f, "{s}"),
+		}
+	}
 }
 
 pub const IDENTIFIER_SYMBOLS: &[(&str, Identifier)] = &[
+	("let", Identifier::Let),
 	("print", Identifier::Print),
-	("pascal", Identifier::Pascal),
 ];
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Literal {
-	Integer(i32)
+	Integer(i32),
+	Identifier(Identifier)
 }
 
 pub const TOKEN_SYMBOLS: &[(&str, Token)] = &[
@@ -51,4 +63,5 @@ pub const TOKEN_SYMBOLS: &[(&str, Token)] = &[
 	("*", Token::Asterisk),
 	("/", Token::Slash),
 	(";", Token::Semicolon),
+	("=", Token::Equals),
 ];

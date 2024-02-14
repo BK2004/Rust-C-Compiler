@@ -7,67 +7,26 @@ target triple = "x86_64-pc-linux-gnu"
 
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local i32 @main() #0 {
-	%1 = alloca i32, align 4
-	%2 = alloca i32, align 4
-	%3 = alloca i32, align 4
-	store i32 2, i32* %3
-	store i32 3, i32* %2
-	store i32 5, i32* %1
-	%4 = load i32, i32* %2
-	%5 = load i32, i32* %1
-	%6 = mul nsw i32 %4, %5
-	%7 = load i32, i32* %3
-	%8 = sub nsw i32 %7, %6
-	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i32 %8)
-	%10 = alloca i32, align 4
-	%11 = alloca i32, align 4
-	%12 = alloca i32, align 4
-	%13 = alloca i32, align 4
-	%14 = alloca i32, align 4
-	%15 = alloca i32, align 4
-	%16 = alloca i32, align 4
-	store i32 7, i32* %16
-	store i32 32, i32* %15
-	%17 = load i32, i32* %16
-	%18 = load i32, i32* %15
-	%19 = mul nsw i32 %17, %18
-	store i32 8, i32* %14
-	store i32 2, i32* %13
-	%20 = load i32, i32* %14
-	%21 = load i32, i32* %13
-	%22 = udiv i32 %20, %21
-	store i32 3, i32* %12
-	%23 = load i32, i32* %12
-	%24 = mul nsw i32 %22, %23
-	%25 = sub nsw i32 %19, %24
-	store i32 5, i32* %11
-	store i32 2, i32* %10
-	%26 = load i32, i32* %11
-	%27 = load i32, i32* %10
-	%28 = mul nsw i32 %26, %27
-	%29 = add nsw i32 %25, %28
-	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i32 %29)
-	%31 = alloca i32, align 4
-	%32 = alloca i32, align 4
-	%33 = alloca i32, align 4
-	%34 = alloca i32, align 4
-	%35 = alloca i32, align 4
-	store i32 5, i32* %35
-	store i32 9, i32* %34
-	store i32 3, i32* %33
-	%36 = load i32, i32* %34
-	%37 = load i32, i32* %33
-	%38 = udiv i32 %36, %37
-	%39 = load i32, i32* %35
-	%40 = add nsw i32 %39, %38
-	store i32 3, i32* %32
-	%41 = load i32, i32* %32
-	%42 = add nsw i32 %40, %41
-	store i32 1, i32* %31
-	%43 = load i32, i32* %31
-	%44 = sub nsw i32 %42, %43
-	%45 = add i32 1024, 0
-	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i32 %45)
+	%x = alloca i32
+	%1 = mul nsw i32 3, 2
+	%2 = add nsw i32 7, %1
+	store i32 %2, i32* %x
+	%y = alloca i32
+	%3 = udiv i32 12, 3
+	store i32 %3, i32* %y
+	%z = alloca i32
+	%4 = load i32, i32* %x
+	%5 = load i32, i32* %y
+	%6 = sub nsw i32 %4, %5
+	store i32 %6, i32* %z
+	%7 = load i32, i32* %x
+	%8 = load i32, i32* %y
+	%9 = mul nsw i32 %7, %8
+	%10 = load i32, i32* %x
+	%11 = load i32, i32* %z
+	%12 = mul nsw i32 %10, %11
+	%13 = add nsw i32 %9, %12
+	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i32 %13)
 	ret i32 0
 }
 

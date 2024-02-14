@@ -1,3 +1,5 @@
-print 2 - 3 * 5;
-print 7 * 32 - 8 / 2 * 3 + 5 * 2;
-pascal 5 + 9/3 + 3 - 1;
+let x = 7 + 3 * 2;
+let y = 12 / 3;
+let z = x - y;
+
+print x * y + x * z;
