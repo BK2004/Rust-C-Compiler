@@ -8,6 +8,24 @@ pub enum LLVMValue {
 	None
 }
 
+impl LLVMValue {
+	pub fn val_type(&self) -> String {
+		match self {
+			LLVMValue::None => String::from("none"),
+			LLVMValue::Constant(c) => c.const_type(),
+			LLVMValue::VirtualRegister(v) => v.reg_type(),
+		}
+	}
+
+	pub fn format(&self) -> RegisterFormat {
+		match self {
+			LLVMValue::None => RegisterFormat::Void,
+			LLVMValue::Constant(c) => c.format(),
+			LLVMValue::VirtualRegister(r) => r.format().clone(),
+		}
+	}
+}
+
 impl std::fmt::Display for LLVMValue {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
 		match self {
@@ -20,7 +38,21 @@ impl std::fmt::Display for LLVMValue {
 
 #[derive(Debug, Clone)]
 pub enum Constant {
-	Integer(i32),
+	Integer(i64),
+}
+
+impl Constant {
+	pub fn const_type(&self) -> String {
+		match self {
+			Constant::Integer(_) => String::from("i64"),
+		}
+	}
+
+	pub fn format(&self) -> RegisterFormat {
+		match self {
+			Constant::Integer(_) => RegisterFormat::Integer,
+		}
+	}
 }
 
 impl fmt::Display for Constant {
@@ -52,6 +84,10 @@ impl VirtualRegister {
 	pub fn format(&self) -> &RegisterFormat {
 		&self.format
 	}
+
+	pub fn reg_type(&self) -> String {
+		self.format.format_type()
+	}
 }
 
 impl fmt::Display for VirtualRegister {
@@ -62,8 +98,27 @@ impl fmt::Display for VirtualRegister {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegisterFormat {
+	Void,
 	Integer,
 	Identifier,
+	Pointer {
+		pointee: Box<RegisterFormat>,
+	},
+}
+
+impl RegisterFormat {
+	pub fn to_pointer(&self) -> RegisterFormat {
+		RegisterFormat::Pointer { pointee: Box::new(self.clone()) }
+	}
+
+	pub fn format_type(&self) -> String {
+		match self {
+			RegisterFormat::Void => String::from("void"),
+			RegisterFormat::Identifier => String::from("i64*"),
+			RegisterFormat::Integer => String::from("i64"),
+			RegisterFormat::Pointer { pointee } => String::from(format!("{}*", pointee.format_type())),
+		}
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -78,6 +133,12 @@ impl Symbol {
 	pub fn name(&self) -> &str {
 		match self {
 			Symbol::Local { name, .. } => name.as_str(),
+		}
+	}
+
+	pub fn value(&self) -> &LLVMValue {
+		match self {
+			Symbol::Local { value, .. } => value,
 		}
 	}
 }
@@ -148,7 +209,7 @@ impl SymbolTable {
 		Err(Error::SymbolUndefined { name: name.to_owned() })
 	}
 
-	pub fn get(&mut self, name: &str) -> Result<&Symbol> {
+	pub fn get(&self, name: &str) -> Result<&Symbol> {
 		let hash = self.hash(name);
 
 		let mut curr = &self.buckets[hash];
@@ -202,12 +263,13 @@ impl SymbolTable {
 	}
 
 	pub fn create_local(&self, name: &String, format: &RegisterFormat) -> (Symbol, VirtualRegister) {
-		let reg = VirtualRegister::new(name.to_owned(), format.clone());
+		let value = VirtualRegister::new(name.to_owned(), format.clone());
 		let symbol = Symbol::Local {
 			name: name.to_owned(),
-			value: LLVMValue::VirtualRegister(reg.clone()),
+			value: LLVMValue::VirtualRegister(value.clone()),
 		};
+		let pointer = VirtualRegister::new(name.to_owned(), format.to_pointer());
 
-		(symbol, reg)
+		(symbol, pointer)
 	}
 }

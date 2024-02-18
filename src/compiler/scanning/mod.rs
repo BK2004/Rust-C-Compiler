@@ -145,10 +145,10 @@ impl Scanner {
 	}
 
 	// Scan in integer literal
-	pub fn scan_integer_literal(&mut self, mut c: char) -> Result<i32> {
-		let mut res: i32 = 0;
+	pub fn scan_integer_literal(&mut self, mut c: char) -> Result<i64> {
+		let mut res: i64 = 0;
 		while c.is_numeric() {
-			res = res * 10 + (c as i32 - ('0' as i32));
+			res = res * 10 + (c as i64 - ('0' as i64));
 			
 			match self.next_char()? {
 				Some(next) => {c = next;},
@@ -164,7 +164,7 @@ impl Scanner {
 	// Scan in identifier
 	pub fn scan_identifier(&mut self, mut c: char) -> Result<String> {
 		let mut res: String = String::from("");
-		while c.is_alphanumeric() {
+		while c.is_alphanumeric() || c == '_' {
 			res.insert(res.len(), c);
 
 			match self.next_char()? {

@@ -78,7 +78,7 @@ impl Parser {
 		let identifier = self.match_identifier()?;
 		self.scan_next()?;
 
-		Ok(Some(match identifier {
+		Ok(Some(match &identifier {
 			Identifier::Print => {
 				Ok(ASTNode::Print {
 					expr: {
@@ -117,7 +117,18 @@ impl Parser {
 					_ => Err(Error::InvalidIdentifier { expected: [Identifier::Symbol("".to_string())].to_vec(), received: id })
 				}
 			},
-			_ => Err(Error::InvalidIdentifier { received: identifier, expected: [Identifier::Print, Identifier::Let].to_vec() }),
+			Identifier::Symbol(_) => {
+				// Should match <symbol> = <value>;
+				let token = self.match_token(&[Token::Equals])?;
+				self.scan_next()?;
+
+				let val = Box::new(self.parse_binary_operation(0)?);
+				self.match_token(&[Token::Semicolon])?;
+				self.scan_next()?;
+
+				Ok(ASTNode::Binary { token, left: Box::new(ASTNode::Literal(Literal::Identifier(identifier.clone()))), right: val })
+			},
+			_ => Err(Error::InvalidIdentifier { received: identifier, expected: [Identifier::Print, Identifier::Let, Identifier::Symbol("".to_string())].to_vec() }),
 		}?))
 	}
 

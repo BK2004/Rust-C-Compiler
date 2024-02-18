@@ -66,18 +66,18 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 	}
 
 	// Allocate space for local variable
-	pub fn write_local_alloc(&mut self, register: &VirtualRegister) -> Result<()> {
-		self.writeln(&format!("\t{register} = alloca i32"))
+	pub fn write_local_alloc(&mut self, register: &VirtualRegister, format: &RegisterFormat) -> Result<()> {
+		self.writeln(&format!("\t{register} = alloca {}", format.format_type()))
 	}
 
 	// Load src register into target
-	pub fn write_load(&mut self, src: &LLVMValue, trg: &LLVMValue) -> Result<()> {
-		self.writeln(&format!("\t{trg} = load i32, i32* {src}"))
+	pub fn write_load(&mut self, src: &LLVMValue, trg: &VirtualRegister) -> Result<()> {
+		self.writeln(&format!("\t{trg} = load {}, {} {src}", trg.reg_type(), src.val_type()))
 	}
 
 	// Store value in register
 	pub fn write_store(&mut self, src: &LLVMValue, trg: &LLVMValue) -> Result<()> {
-		self.writeln(&format!("\tstore i32 {src}, i32* {trg}"))
+		self.writeln(&format!("\tstore {} {src}, {} {trg}", src.val_type(), trg.val_type()))
 	}
 
 	// Write a multiplication to the LLVM file
@@ -94,7 +94,7 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
 		}?;
 
-		self.writeln(&format!("\t%{reg} = mul nsw i32 {l_val}, {r_val}"))
+		self.writeln(&format!("\t%{reg} = mul nsw {} {l_val}, {r_val}", left.val_type()))
 	}
 
 	// Write a subtraction operation to the LLVM file
@@ -111,7 +111,7 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
 		}?;
 
-		self.writeln(&format!("\t%{reg} = sub nsw i32 {l_val}, {r_val}"))
+		self.writeln(&format!("\t%{reg} = sub nsw {} {l_val}, {r_val}", left.val_type()))
 	}
 
 	// Write an addition operation to the LLVM file
@@ -128,7 +128,7 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
 		}?;
 
-		self.writeln(&format!("\t%{reg} = add nsw i32 {l_val}, {r_val}"))
+		self.writeln(&format!("\t%{reg} = add nsw {} {l_val}, {r_val}", left.val_type()))
 	}
 
 	// Write an addition operation to the LLVM file
@@ -145,12 +145,12 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
 		}?;
 
-		self.writeln(&format!("\t%{reg} = udiv i32 {l_val}, {r_val}"))
+		self.writeln(&format!("\t%{reg} = udiv {} {l_val}, {r_val}", left.val_type()))
 	}
 
 	// Print integer (i32)
 	pub fn write_print(&mut self, val: &LLVMValue) -> Result<()> {
-		self.writeln(&format!("\tcall i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i32 {val})"))
+		self.writeln(&format!("\tcall i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), {} {val})", val.val_type()))
 	}
 
 	pub fn write(&mut self, msg: &str) -> Result<()> {

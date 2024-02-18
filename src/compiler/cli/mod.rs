@@ -34,13 +34,11 @@ pub fn compile(args: &Args) -> Result<()> {
 			println!("Compiling {}.", filename);
 		}
 
-		let scanner = crate::scanning::Scanner::open_file(filename.clone())?;
+		let scanner = crate::scanning::Scanner::open_file(filename.to_owned())?;
 		let mut parser = crate::parsing::Parser::new(scanner)?;
 
-		let mut generator = crate::generating::Generator::from_filename(filename.clone() + ".ll")?;
+		let mut generator = crate::generating::Generator::from_filename(filename.to_owned() + ".ll")?;
 		generator.generate(&mut parser)?;
-
-		// println!("{}", interpret_ast(&parser.parse_binary_operation(0)?)?);
 	}
 
 	Ok(())

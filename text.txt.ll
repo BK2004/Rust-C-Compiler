@@ -7,26 +7,48 @@ target triple = "x86_64-pc-linux-gnu"
 
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local i32 @main() #0 {
-	%x = alloca i32
-	%1 = mul nsw i32 3, 2
-	%2 = add nsw i32 7, %1
-	store i32 %2, i32* %x
-	%y = alloca i32
-	%3 = udiv i32 12, 3
-	store i32 %3, i32* %y
-	%z = alloca i32
-	%4 = load i32, i32* %x
-	%5 = load i32, i32* %y
-	%6 = sub nsw i32 %4, %5
-	store i32 %6, i32* %z
-	%7 = load i32, i32* %x
-	%8 = load i32, i32* %y
-	%9 = mul nsw i32 %7, %8
-	%10 = load i32, i32* %x
-	%11 = load i32, i32* %z
-	%12 = mul nsw i32 %10, %11
-	%13 = add nsw i32 %9, %12
-	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i32 %13)
+	%x = alloca i64
+	%1 = mul nsw i64 3, 2
+	%2 = add nsw i64 7, %1
+	store i64 %2, i64* %x
+	%y = alloca i64
+	%3 = udiv i64 12, 3
+	store i64 %3, i64* %y
+	%z = alloca i64
+	%4 = load i64, i64* %x
+	%5 = load i64, i64* %y
+	%6 = sub nsw i64 %4, %5
+	store i64 %6, i64* %z
+	%7 = load i64, i64* %x
+	%8 = load i64, i64* %y
+	%9 = mul nsw i64 %7, %8
+	%10 = load i64, i64* %x
+	%11 = load i64, i64* %z
+	%12 = mul nsw i64 %10, %11
+	%13 = add nsw i64 %9, %12
+	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %13)
+	store i64 2, i64* %x
+	store i64 3, i64* %y
+	%15 = load i64, i64* %x
+	%16 = load i64, i64* %y
+	%17 = mul nsw i64 %15, %16
+	%18 = load i64, i64* %x
+	%19 = load i64, i64* %z
+	%20 = mul nsw i64 %18, %19
+	%21 = add nsw i64 %17, %20
+	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %21)
+	%abra_cada_bra = alloca i64
+	store i64 2, i64* %abra_cada_bra
+	%23 = load i64, i64* %x
+	%24 = load i64, i64* %abra_cada_bra
+	%25 = mul nsw i64 %23, %24
+	%26 = load i64, i64* %y
+	%27 = mul nsw i64 %25, %26
+	%28 = load i64, i64* %z
+	%29 = load i64, i64* %abra_cada_bra
+	%30 = mul nsw i64 %28, %29
+	%31 = sub nsw i64 %27, %30
+	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %31)
 	ret i32 0
 }
 

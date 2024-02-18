@@ -41,6 +41,10 @@ impl Generator {
 		self.next_register
 	}
 
+	pub fn symbol_table(&self) -> &SymbolTable {
+		&self.symbol_table
+	}
+
 	pub fn generate(&mut self, parser: &mut Parser) -> Result<()> {
 		self.writer.write_preamble()?;
 
@@ -74,13 +78,7 @@ impl Generator {
 	pub fn ast_to_llvm(&mut self, root: &ASTNode) -> Result<LLVMValue> {
 		match root {
 			ASTNode::Literal(x) => Ok(self.generate_literal(x)?),
-			ASTNode::Binary {token, left, right} => {
-				// Convert left and right children to llvm values
-				let left_llvm = self.ast_to_llvm(&left)?;
-				let right_llvm = self.ast_to_llvm(&right)?;
-
-				return Ok(self.generate_binary(token, left_llvm, right_llvm)?);
-			},
+			ASTNode::Binary {token, left, right} => Ok(self.generate_binary(token, *(*left).clone(), *(*right).clone())?),
 			ASTNode::Let { name, value } => Ok(self.generate_let(name, value)?),
 			ASTNode::Print { expr } => Ok(self.generate_print(expr)?),
 		}
@@ -99,14 +97,16 @@ impl Generator {
 	}
 
 	// Generate binary statement given operation and left/right LLVMValues
-	pub fn generate_binary(&mut self, token: &Token, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
-		self.ensure_literals(&mut[&mut left, &mut right])?;
+	pub fn generate_binary(&mut self, token: &Token, left: ASTNode, right: ASTNode) -> Result<LLVMValue> {
+		let left = self.ast_to_llvm(&left)?;
+		let right = self.ast_to_llvm(&right)?;
 
 		let out = match token {
 			Token::Asterisk => Ok(self.generate_mul(left, right)?),
 			Token::Minus => Ok(self.generate_sub(left, right)?),
 			Token::Plus => Ok(self.generate_add(left, right)?),
 			Token::Slash => Ok(self.generate_div(left, right)?),
+			Token::Equals => Ok(self.generate_assign(left, right)?),
 			_ => Err(Error::BinaryOperatorExpected { received: token.clone() })
 		}?;
 
@@ -114,7 +114,8 @@ impl Generator {
 	}
 
 	// Generate LLVMValue for multiplication
-	pub fn generate_mul(&mut self, left: LLVMValue, right: LLVMValue) -> Result<LLVMValue> {
+	pub fn generate_mul(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
+		self.ensure_literals(&mut[&mut left, &mut right])?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_mul(&left, &right, reg)?;
 
@@ -122,7 +123,8 @@ impl Generator {
 	}
 
 	// Generate LLVMValue for subtraction
-	pub fn generate_sub(&mut self, left: LLVMValue, right: LLVMValue) -> Result<LLVMValue> {
+	pub fn generate_sub(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
+		self.ensure_literals(&mut[&mut left, &mut right])?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_sub(&left, &right, reg)?;
 
@@ -130,7 +132,8 @@ impl Generator {
 	}
 
 	// Generate LLVMValue for addition
-	pub fn generate_add(&mut self, left: LLVMValue, right: LLVMValue) -> Result<LLVMValue> {
+	pub fn generate_add(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
+		self.ensure_literals(&mut[&mut left, &mut right])?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_add(&left, &right, reg)?;
 
@@ -138,11 +141,20 @@ impl Generator {
 	}
 
 	// Generate LLVMValue for division
-	pub fn generate_div(&mut self, left: LLVMValue, right: LLVMValue) -> Result<LLVMValue> {
+	pub fn generate_div(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
+		self.ensure_literals(&mut[&mut left, &mut right])?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_div(&left, &right, reg)?;
 
 		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer)))
+	}
+
+	// Generate LLVMValue for assignment of left = right
+	pub fn generate_assign(&mut self, left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
+		// Make right an operand, assign it to left, and return left for use again
+		self.ensure_literals(&mut[&mut right])?;
+		self.writer.write_store(&right, &left)?;
+		Ok(left)
 	}
 
 	pub fn generate_let(&mut self, name: &String, value: &Option<Box<ASTNode>>) -> Result<LLVMValue> {
@@ -152,7 +164,7 @@ impl Generator {
 
 		// Write an allocate statement; if there is a value given, then store that value in the local variable
 		let (symbol, reg) = self.symbol_table.create_local(name, &RegisterFormat::Integer);
-		self.writer.write_local_alloc(&reg)?;
+		self.writer.write_local_alloc(&reg, &RegisterFormat::Integer)?;
 
 		if let Some(val) = value {
 			let assigned_llvm = self.ast_to_llvm(&val)?;
@@ -173,19 +185,20 @@ impl Generator {
 			return Err(Error::ExpressionExpected)
 		}
 
+		self.update_virtual_register(1);
 		self.writer.write_print(&val)?;
 
 		Ok(LLVMValue::None)
 	}
 
-	pub fn load_numbered_register(&mut self, val: LLVMValue) -> Result<LLVMValue> {
+	pub fn load_numbered_register(&mut self, format: RegisterFormat, val: LLVMValue) -> Result<LLVMValue> {
 		if let LLVMValue::VirtualRegister(_) = &val {
 			let reg = self.update_virtual_register(1);
-			let reg_val = LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer));
+			let reg_val = VirtualRegister::new(reg.to_string(), format);
 
 			self.writer.write_load(&val.clone(), &reg_val)?;
 
-			Ok(reg_val)
+			Ok(LLVMValue::VirtualRegister(reg_val))
 		} else {
 			Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: val })
 		}
@@ -200,10 +213,16 @@ impl Generator {
 					match r.format() {
 						RegisterFormat::Integer => Ok(()),
 						RegisterFormat::Identifier => {
-							**val = self.load_numbered_register(val.clone())?;
+							**val = self.load_numbered_register(self.symbol_table.get(r.id())?.value().format(), val.clone())?;
 
 							Ok(())
-						}
+						}, 
+						RegisterFormat::Pointer { pointee } => {
+							**val = self.load_numbered_register(*pointee.clone(), val.clone())?;
+
+							Ok(())
+						},
+						RegisterFormat::Void => Ok(()),
 					}
 				},
 				_ => Ok(())
@@ -214,7 +233,7 @@ impl Generator {
 	}
 
 	// Interpret an AST recursively
-	pub fn interpret_ast(&self, node: &crate::parsing::ast::ASTNode) -> Result<i32> {
+	pub fn interpret_ast(&self, node: &crate::parsing::ast::ASTNode) -> Result<i64> {
 		match node {
 			ASTNode::Literal(Literal::Integer(x)) => Ok(*x),
 			ASTNode::Binary{token, left, right} => {

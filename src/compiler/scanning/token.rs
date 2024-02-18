@@ -53,7 +53,7 @@ pub const IDENTIFIER_SYMBOLS: &[(&str, Identifier)] = &[
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Literal {
-	Integer(i32),
+	Integer(i64),
 	Identifier(Identifier)
 }
 
