@@ -1,6 +1,8 @@
 use core::fmt;
 use crate::error::{Error, Result};
 
+use super::{Identifier, Token};
+
 #[derive(Debug, Clone)]
 pub enum LLVMValue {
 	VirtualRegister(VirtualRegister),
@@ -77,6 +79,20 @@ impl VirtualRegister {
 		}
 	}
 
+	pub fn from_identifier(id: String, identifier: Identifier, symbol_table: &SymbolTable) -> Result<Self> {
+		Ok(Self {
+			id,
+			format: match &identifier {
+				Identifier::Symbol(s) => {
+					RegisterFormat::Identifier {
+						id_type: Box::new(symbol_table.get(&s)?.value().format())
+					}
+				},
+				_ => Err(Error::InvalidIdentifier { expected: [Identifier::Symbol("".to_string())].to_vec(), received: identifier })?
+			}
+		})
+	}
+
 	pub fn id(&self) -> &str {
 		&self.id
 	}
@@ -100,7 +116,10 @@ impl fmt::Display for VirtualRegister {
 pub enum RegisterFormat {
 	Void,
 	Integer,
-	Identifier,
+	Boolean,
+	Identifier {
+		id_type: Box<RegisterFormat>,
+	},
 	Pointer {
 		pointee: Box<RegisterFormat>,
 	},
@@ -111,12 +130,40 @@ impl RegisterFormat {
 		RegisterFormat::Pointer { pointee: Box::new(self.clone()) }
 	}
 
+	pub fn can_compare_to(&self, other: &RegisterFormat, op: &Token) -> bool {
+		match (self, other) {
+			(RegisterFormat::Integer, RegisterFormat::Integer) => true,
+			_ => false,
+		}
+	}
+
 	pub fn format_type(&self) -> String {
 		match self {
 			RegisterFormat::Void => String::from("void"),
-			RegisterFormat::Identifier => String::from("i64*"),
+			RegisterFormat::Identifier { id_type } => String::from(format!("{}*", id_type.format_type())),
 			RegisterFormat::Integer => String::from("i64"),
+			RegisterFormat::Boolean => String::from("i1"),
 			RegisterFormat::Pointer { pointee } => String::from(format!("{}*", pointee.format_type())),
+		}
+	}
+
+	pub fn expect(&self, other: &RegisterFormat) -> Result<()> {
+		if self == other {
+			Ok(())
+		} else {
+			Err(Error::InvalidAssignment { received: other.to_owned(), expected: self.to_owned() })
+		}
+	}
+}
+
+impl fmt::Display for RegisterFormat {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			RegisterFormat::Void => write!(f, "void"),
+			RegisterFormat::Boolean => write!(f, "bool"),
+			RegisterFormat::Integer => write!(f, "int"),
+			RegisterFormat::Pointer { pointee } => write!(f, "{pointee}"),
+			RegisterFormat::Identifier { id_type } => write!(f, "{id_type}"),
 		}
 	}
 }

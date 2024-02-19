@@ -10,6 +10,12 @@ pub const OPERATOR_PRECEDENCE: &[(Token, u8)] = &[
 	(Token::Asterisk, 12),
 	(Token::Plus, 11),
 	(Token::Minus, 11),
+	(Token::GreaterThan, 11),
+	(Token::GreaterThanEqual, 11),
+	(Token::LessThan, 11),
+	(Token::LessThanEqual, 11),
+	(Token::Equals2, 10),
+	(Token::ExclamationEqual, 10),
 ];
 
 #[derive(Debug)]
@@ -137,8 +143,6 @@ impl Parser {
 		let Some(token) = self.current_token.clone() else {
 			return Err(Error::LiteralExpected { received: Token::None });
 		};
-
-		dbg!(&token);
 
 		match token {
 			Token::Literal(Literal::Integer(x)) => {self.current_token = self.scanner.scan()?; Ok(ASTNode::Literal(Literal::Integer(x)))},

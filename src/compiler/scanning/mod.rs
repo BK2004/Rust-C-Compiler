@@ -91,8 +91,6 @@ impl Scanner {
 					};
 				}
 
-				dbg!(c);
-
 				Ok(())
 			}
 		}
@@ -148,7 +146,7 @@ impl Scanner {
 				}
 			}
 
-			while remaining_symbols.len() > 1 {
+			while remaining_symbols.len() >= 1 {
 				// If character is alphanumeric/whitespace or EOF reached, stop reading symbols
 				if let Some(next) = self.next_char()? {
 					c = next;

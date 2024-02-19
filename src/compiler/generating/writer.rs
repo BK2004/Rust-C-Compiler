@@ -148,6 +148,11 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 		self.writeln(&format!("\t%{reg} = udiv {} {l_val}, {r_val}", left.val_type()))
 	}
 
+	// Compare left and right via 'op'
+	pub fn write_cmp(&mut self, left: &LLVMValue, right: &LLVMValue, reg: u32, op: String) -> Result<()> {
+		self.writeln(&format!("\t%{reg} = icmp {op} {} {left}, {right}", left.val_type()))
+	}
+
 	// Print integer (i32)
 	pub fn write_print(&mut self, val: &LLVMValue) -> Result<()> {
 		self.writeln(&format!("\tcall i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), {} {val})", val.val_type()))

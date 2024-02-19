@@ -11,6 +11,33 @@ pub enum Token {
 	Slash,
 	Semicolon,
 	Equals,
+	Equals2,
+	ExclamationEqual,
+	LessThan,
+	LessThanEqual,
+	GreaterThan,
+	GreaterThanEqual,
+}
+
+impl Token {
+	pub fn is_comparison(&self) -> bool {
+		match self {
+			Token::Equals2 | Token::ExclamationEqual | Token::LessThan | Token::LessThanEqual | Token::GreaterThan | Token::GreaterThanEqual => true,
+			_ => false,
+		}
+	}
+
+	pub fn get_pnemonic(&self) -> String {
+		match self {
+			Token::Equals2 => String::from("eq"),
+			Token::ExclamationEqual => String::from("ne"),
+			Token::LessThan => String::from("slt"),
+			Token::LessThanEqual => String::from("sle"),
+			Token::GreaterThan => String::from("sgt"),
+			Token::GreaterThanEqual => String::from("sge"),
+			_ => String::from(""),
+		}
+	}
 }
 
 impl fmt::Display for Token {
@@ -25,6 +52,12 @@ impl fmt::Display for Token {
 			Token::Slash => write!(f, "/"),
 			Token::Semicolon => write!(f, ";"),
 			Token::Equals => write!(f, "="),
+			Token::Equals2 => write!(f, "=="),
+			Token::ExclamationEqual => write!(f, "!="),
+			Token::LessThan => write!(f, "<"),
+			Token::LessThanEqual => write!(f, "<="),
+			Token::GreaterThan => write!(f, ">"),
+			Token::GreaterThanEqual => write!(f, ">="),
 		}
 	}
 }
@@ -64,4 +97,10 @@ pub const TOKEN_SYMBOLS: &[(&str, Token)] = &[
 	("/", Token::Slash),
 	(";", Token::Semicolon),
 	("=", Token::Equals),
+	("==", Token::Equals2),
+	("!=", Token::ExclamationEqual),
+	("<", Token::LessThan),
+	("<=", Token::LessThanEqual),
+	(">", Token::GreaterThan),
+	(">=", Token::GreaterThanEqual),
 ];

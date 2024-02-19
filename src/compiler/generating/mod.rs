@@ -90,7 +90,7 @@ impl Generator {
 		match literal {
 			Literal::Integer(x) => Ok(LLVMValue::Constant(Constant::Integer(*x))),
 			Literal::Identifier(i) => match i {
-				Identifier::Symbol(x) => Ok(LLVMValue::VirtualRegister(VirtualRegister::new(x.to_owned(), RegisterFormat::Identifier))),
+				Identifier::Symbol(x) => Ok(LLVMValue::VirtualRegister(VirtualRegister::from_identifier(x.to_owned(), i.to_owned(), self.symbol_table())?)),
 				_ => Err(Error::TerminalTokenExpected { received_token: None, received_identifier: Some(i.clone()) })
 			},
 		}
@@ -107,7 +107,14 @@ impl Generator {
 			Token::Plus => Ok(self.generate_add(left, right)?),
 			Token::Slash => Ok(self.generate_div(left, right)?),
 			Token::Equals => Ok(self.generate_assign(left, right)?),
-			_ => Err(Error::BinaryOperatorExpected { received: token.clone() })
+			_ => {
+				// If token is a comparison operator, generate a comparison
+				if token.is_comparison() {
+					Ok(self.generate_comparison(token.to_owned(), left, right)?)
+				} else {
+					Err(Error::BinaryOperatorExpected { received: token.clone() })
+				}
+			}
 		}?;
 
 		Ok(out)
@@ -116,6 +123,7 @@ impl Generator {
 	// Generate LLVMValue for multiplication
 	pub fn generate_mul(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
 		self.ensure_literals(&mut[&mut left, &mut right])?;
+		self.ensure_arithmetic_operands(&mut left, &mut right)?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_mul(&left, &right, reg)?;
 
@@ -125,6 +133,7 @@ impl Generator {
 	// Generate LLVMValue for subtraction
 	pub fn generate_sub(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
 		self.ensure_literals(&mut[&mut left, &mut right])?;
+		self.ensure_arithmetic_operands(&mut left, &mut right)?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_sub(&left, &right, reg)?;
 
@@ -134,6 +143,7 @@ impl Generator {
 	// Generate LLVMValue for addition
 	pub fn generate_add(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
 		self.ensure_literals(&mut[&mut left, &mut right])?;
+		self.ensure_arithmetic_operands(&mut left, &mut right)?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_add(&left, &right, reg)?;
 
@@ -142,7 +152,7 @@ impl Generator {
 
 	// Generate LLVMValue for division
 	pub fn generate_div(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
-		self.ensure_literals(&mut[&mut left, &mut right])?;
+		self.ensure_arithmetic_operands(&mut left, &mut right)?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_div(&left, &right, reg)?;
 
@@ -153,8 +163,20 @@ impl Generator {
 	pub fn generate_assign(&mut self, left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
 		// Make right an operand, assign it to left, and return left for use again
 		self.ensure_literals(&mut[&mut right])?;
+		left.format().expect(&right.format())?;
 		self.writer.write_store(&right, &left)?;
 		Ok(left)
+	}
+
+	// Generate LLVMValue for comparison operator
+	pub fn generate_comparison(&mut self, operator: Token, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
+		// Make sure both sides are operands, compare them, and store the result as a boolean register
+		self.ensure_comparison_operands(&mut left, &mut right, &operator)?;
+		let pnemonic = operator.get_pnemonic();
+		let reg = self.update_virtual_register(1);
+		self.writer.write_cmp(&left, &right, reg, pnemonic)?;
+		
+		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Boolean)))
 	}
 
 	pub fn generate_let(&mut self, name: &String, value: &Option<Box<ASTNode>>) -> Result<LLVMValue> {
@@ -162,24 +184,26 @@ impl Generator {
 			return Err(Error::SymbolDeclared { name: name.to_owned() });
 		}
 
-		// Write an allocate statement; if there is a value given, then store that value in the local variable
-		let (symbol, reg) = self.symbol_table.create_local(name, &RegisterFormat::Integer);
-		self.writer.write_local_alloc(&reg, &RegisterFormat::Integer)?;
-
 		if let Some(val) = value {
 			let assigned_llvm = self.ast_to_llvm(&val)?;
-
+			let (symbol, reg) = self.symbol_table.create_local(name, &assigned_llvm.format());
+			self.writer.write_local_alloc(&reg, &assigned_llvm.format())?;
 			self.writer.write_store(&assigned_llvm, &LLVMValue::VirtualRegister(reg))?;
+			self.symbol_table.insert(symbol);
+		} else {
+			// No value assigned; allocate an int
+			let (symbol, reg) = self.symbol_table.create_local(name, &RegisterFormat::Integer);
+			self.writer.write_local_alloc(&reg, &RegisterFormat::Integer)?;
+			self.symbol_table.insert(symbol);
 		}
-
-		self.symbol_table.insert(symbol);
 
 		Ok(LLVMValue::None)
 	}
 
 	// Generate print statement
 	pub fn generate_print(&mut self, expr: &ASTNode) -> Result<LLVMValue> {
-		let val = self.ast_to_llvm(expr)?;
+		let mut val = self.ast_to_llvm(expr)?;
+		self.ensure_literals(&mut[&mut val])?;
 		
 		if let LLVMValue::None = val {
 			return Err(Error::ExpressionExpected)
@@ -204,6 +228,35 @@ impl Generator {
 		}
 	}
 
+	// Verify that LLVMValues are able to be operated on by arithmetic
+	pub fn ensure_arithmetic_operands(&mut self, left: &mut LLVMValue, right: &mut LLVMValue) -> Result<()> {
+		self.ensure_literals(&mut[left, right])?;
+
+		if let RegisterFormat::Integer = left.format() {
+			if let RegisterFormat::Integer = right.format() {
+				Ok(())
+			} else {
+				Err(Error::InvalidArithmeticOperand { received: right.format() })
+			}
+		} else {
+			Err(Error::InvalidArithmeticOperand { received: left.format() })
+		}
+	}
+
+	// Verify that left and right can be compared
+	pub fn ensure_comparison_operands(&mut self, left: &mut LLVMValue, right: &mut LLVMValue, op: &Token) -> Result<()> {
+		self.ensure_literals(&mut[left, right])?;
+
+		let left_fmt = left.format();
+		let right_fmt = right.format();
+
+		if left_fmt.can_compare_to(&right_fmt, op) {
+			Ok(())
+		} else {
+			Err(Error::InvalidComparisonOperands { left: left_fmt, right: right_fmt })
+		}
+	}
+
 	// Ensure that given LLVM Values are in operatable form
 	pub fn ensure_literals(&mut self, nodes: &mut [&mut LLVMValue]) -> Result<()> {
 		for (_, val) in nodes.iter_mut().enumerate() {
@@ -211,9 +264,8 @@ impl Generator {
 				LLVMValue::None => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::Constant(Constant::Integer(3)), received: val.clone() }),
 				LLVMValue::VirtualRegister(r) => {
 					match r.format() {
-						RegisterFormat::Integer => Ok(()),
-						RegisterFormat::Identifier => {
-							**val = self.load_numbered_register(self.symbol_table.get(r.id())?.value().format(), val.clone())?;
+						RegisterFormat::Identifier { id_type } => {
+							**val = self.load_numbered_register(*id_type.to_owned(), val.clone())?;
 
 							Ok(())
 						}, 
@@ -222,7 +274,7 @@ impl Generator {
 
 							Ok(())
 						},
-						RegisterFormat::Void => Ok(()),
+						_ => Ok(()),
 					}
 				},
 				_ => Ok(())

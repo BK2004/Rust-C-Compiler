@@ -1,7 +1,7 @@
 use std::{fmt, result};
 
 use crate::scanning::token::{Identifier, Token};
-use crate::generating::llvm::LLVMValue;
+use crate::generating::llvm::{LLVMValue, RegisterFormat};
 
 pub type Result<T> = result::Result<T, Error>;
 
@@ -24,6 +24,9 @@ pub enum Error {
 	SymbolDeclared { name: String },
 	StatementExpected,
 	ExpressionExpected,
+	InvalidArithmeticOperand { received: RegisterFormat },
+	InvalidComparisonOperands { left: RegisterFormat, right: RegisterFormat },
+	InvalidAssignment { received: RegisterFormat, expected: RegisterFormat },
 }
 
 impl fmt::Display for Error {
@@ -82,9 +85,12 @@ impl fmt::Display for Error {
 				} else if let Some(i) = received_identifier {
 					write!(f, "TerminalTokenExpected: Expected a terminal token, but got {i} instead")
 				} else {
-					write!(f, "TerminalTOkenExpected")
+					write!(f, "TerminalTokenExpected")
 				}
-			}
+			},
+			Error::InvalidArithmeticOperand { received } => write!(f, "InvalidArithmeticOperand: Attempted to perform arithmetic on {received}"),
+			Error::InvalidComparisonOperands { left, right } => write!(f, "InvalidComparisonOperands: Attempted to compare {left} and {right}"),
+			Error::InvalidAssignment { received, expected } => write!(f, "InvalidAssigment: Attempted to assign {received} to {expected}"),
 		}
 	}
 }
