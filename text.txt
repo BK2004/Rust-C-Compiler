@@ -1,12 +1,14 @@
-let x = 7 + 3 * 2;
-let y = 12 / 3;
+// this is a line comment
+let x = 7 + 3 // this makes sure scanner will register semicolon at start of next line * 2;
+;let y = 12 / 3;
 let z = x - y;
 
-print x * y + x * z;
+print x * y + x * z; // this should print 100
 
 x = 2;
 y = 3;
-print x * y + x * z;
+print x * y + x * z; // this should print 18
 
 let abra_cada_bra = 2;
-print x * abra_cada_bra * y - z * abra_cada_bra;
+print x * abra_cada_bra * y - z * abra_cada_bra; // Expected output is 0
+

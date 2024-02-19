@@ -73,11 +73,51 @@ impl Scanner {
 		self.next_char()
 	}
 
+	// Scan a line comment; end scan when new line is reached
+	pub fn scan_line_comment(&mut self) -> Result<()> {
+		let nxt = self.next_char()?;
+
+		match nxt {
+			None => Ok(()),
+			Some(mut c) => {
+				while c != '\n' {
+					let next_char = self.next_char()?;
+
+					match next_char {
+						Some(nxt) => {
+							c = nxt;
+						},
+						None => { return Ok(()); },
+					};
+				}
+
+				dbg!(c);
+
+				Ok(())
+			}
+		}
+	}
+
 	// Scan in next token and return result
 	pub fn scan(&mut self) -> Result<Option<Token>> {
 		let next = self.skip_whitespace()?;
 
 		if let Some(mut c) = next {
+			// Check if c is a /, if it is, check if next character is a slash; if it is, scan next character until new line is reached
+			if c == '/' {
+				let next = self.next_char()?;
+				if let Some(next_char) = next {
+					if next_char == '/' {
+						// Line comment
+						self.scan_line_comment()?;
+
+						return Ok(self.scan()?);
+					} else {
+						self.put_back(next_char);
+					}
+				}
+			}
+
 			// Check if c is the start of a literal
 			if c.is_numeric() {
 				let num = self.scan_integer_literal(c)?;
