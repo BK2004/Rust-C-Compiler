@@ -147,8 +147,8 @@ impl RegisterFormat {
 		}
 	}
 
-	pub fn expect(&self, other: &RegisterFormat) -> Result<()> {
-		if self == other {
+	pub fn expect(&self, other: RegisterFormat) -> Result<()> {
+		if self.to_owned().to_string() == other.to_string() {
 			Ok(())
 		} else {
 			Err(Error::InvalidAssignment { received: other.to_owned(), expected: self.to_owned() })

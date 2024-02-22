@@ -15,5 +15,9 @@ pub enum ASTNode {
 		expr: Box<ASTNode>,
 		block: Vec<ASTNode>,
 		else_block: Option<Vec<ASTNode>>,
+	},
+	While {
+		expr: Box<ASTNode>,
+		block: Vec<ASTNode>
 	}
 }

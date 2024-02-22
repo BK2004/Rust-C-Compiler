@@ -90,6 +90,7 @@ impl Generator {
 			ASTNode::Binary {token, left, right} => Ok(self.generate_binary(token, *(*left).clone(), *(*right).clone())?),
 			ASTNode::Let { name, value } => Ok(self.generate_let(name, value)?),
 			ASTNode::If { expr, block, else_block } => Ok(self.generate_if(expr, block, else_block)?),
+			ASTNode::While { expr, block } => Ok(self.generate_while(expr, block)?),
 			ASTNode::Print { expr } => Ok(self.generate_print(expr)?),
 		}
 
@@ -173,7 +174,8 @@ impl Generator {
 	pub fn generate_assign(&mut self, left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
 		// Make right an operand, assign it to left, and return left for use again
 		self.ensure_literals(&mut[&mut right])?;
-		left.format().expect(&right.format())?;
+		println!("{}:{} :: {}", left.format(), right.format(), left.format() == right.format());
+		left.format().expect(right.format())?;
 		self.writer.write_store(&right, &left)?;
 		Ok(left)
 	}
@@ -213,7 +215,7 @@ impl Generator {
 	// Generate if statement
 	pub fn generate_if(&mut self, expr: &ASTNode, block: &Vec<ASTNode>, else_block: &Option<Vec<ASTNode>>) -> Result<LLVMValue> {
 		let expr_llvm = self.ast_to_llvm(expr)?;
-		expr_llvm.format().expect(&RegisterFormat::Boolean)?;
+		expr_llvm.format().expect(RegisterFormat::Boolean)?;
 
 		// Generate a label for if branch.
 		// If else is present, generate an else label, emit conditional branch with body label and else label, and parse blocks
@@ -258,6 +260,30 @@ impl Generator {
 			self.writer.write_branch(&tail_label)?;
 			self.writer.write_label(&tail_label)?;
 		}
+
+		Ok(LLVMValue::None)
+	}
+
+	pub fn generate_while(&mut self, expr: &ASTNode, block: &Vec<ASTNode>) -> Result<LLVMValue> {
+		let cond_label = Label::new(self.update_label_count(1));
+		let body_label = Label::new(self.update_label_count(1));
+		let tail_label = Label::new(self.update_label_count(1));
+
+		self.writer.write_branch(&cond_label)?;
+		self.writer.write_label(&cond_label)?;
+		let expr_llvm = self.ast_to_llvm(expr)?;
+		expr_llvm.format().expect(RegisterFormat::Boolean)?;
+		self.writer.write_cond_branch(&expr_llvm, &body_label, &tail_label)?;
+
+		// Write body
+		self.writer.write_label(&body_label)?;
+		for body_statement in block {
+			self.ast_to_llvm(body_statement)?;
+		}
+		self.writer.write_branch(&cond_label)?;
+
+		// Tail
+		self.writer.write_label(&tail_label)?;
 
 		Ok(LLVMValue::None)
 	}

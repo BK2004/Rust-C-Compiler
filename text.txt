@@ -1,20 +1,12 @@
-let x = 3;
-let y = 2;
-let a = x + y;
-let b = x - y;
+let i = 0;
 
-if a > b {
-	print a;
-
-	if b - a > y {
-		print y;
+while i <= 10 {
+	print i;
+	if i < 5 {
+		print 444;
 	} else {
-		if x > y {
-			print x;
-		} else {
-			print y;
-		}
+		print 555;
 	}
-} else {
-	print b;
+
+	i = i + 1;
 }

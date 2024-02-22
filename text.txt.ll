@@ -7,58 +7,30 @@ target triple = "x86_64-pc-linux-gnu"
 
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local i32 @main() #0 {
-	%x = alloca i64
-	store i64 3, i64* %x
-	%y = alloca i64
-	store i64 2, i64* %y
-	%1 = load i64, i64* %x
-	%2 = load i64, i64* %y
-	%3 = add nsw i64 %1, %2
-	%a = alloca i64
-	store i64 %3, i64* %a
-	%4 = load i64, i64* %x
-	%5 = load i64, i64* %y
-	%6 = sub nsw i64 %4, %5
-	%b = alloca i64
-	store i64 %6, i64* %b
-	%7 = load i64, i64* %a
-	%8 = load i64, i64* %b
-	%9 = icmp sgt i64 %7, %8
-	br i1 %9, label %label.0, label %label.1
+	%i = alloca i64
+	store i64 0, i64* %i
+	br label %label.0
 label.0:
-	%10 = load i64, i64* %a
-	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %10)
-	%12 = load i64, i64* %b
-	%13 = load i64, i64* %a
-	%14 = sub nsw i64 %12, %13
-	%15 = load i64, i64* %y
-	%16 = icmp sgt i64 %14, %15
-	br i1 %16, label %label.3, label %label.4
+	%1 = load i64, i64* %i
+	%2 = icmp sle i64 %1, 10
+	br i1 %2, label %label.1, label %label.2
+label.1:
+	%3 = load i64, i64* %i
+	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %3)
+	%5 = load i64, i64* %i
+	%6 = icmp slt i64 %5, 5
+	br i1 %6, label %label.3, label %label.4
 label.3:
-	%17 = load i64, i64* %y
-	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %17)
+	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 444)
 	br label %label.5
 label.4:
-	%19 = load i64, i64* %x
-	%20 = load i64, i64* %y
-	%21 = icmp sgt i64 %19, %20
-	br i1 %21, label %label.6, label %label.7
-label.6:
-	%22 = load i64, i64* %x
-	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %22)
-	br label %label.8
-label.7:
-	%24 = load i64, i64* %y
-	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %24)
-	br label %label.8
-label.8:
+	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 555)
 	br label %label.5
 label.5:
-	br label %label.2
-label.1:
-	%26 = load i64, i64* %b
-	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %26)
-	br label %label.2
+	%9 = load i64, i64* %i
+	%10 = add nsw i64 %9, 1
+	store i64 %10, i64* %i
+	br label %label.0
 label.2:
 	ret i32 0
 }

@@ -144,6 +144,17 @@ impl Parser {
 
 				Ok(ASTNode::If { expr, block, else_block })
 			},
+			Identifier::While => {
+				// Follows 'while <expr> <block>'
+				// Expecting boolean expression after keyword
+				let expr = Box::new(self.parse_binary_operation(0)?);
+
+				// Parse a block statement and error if there isn't one
+				let block = self.parse_block_statement()?;
+				self.scan_next()?;
+
+				Ok(ASTNode::While { expr, block })
+			},
 			Identifier::Symbol(_) => {
 				// Should match <symbol> = <value>;
 				let token = self.match_token(&[Token::Equals])?;
