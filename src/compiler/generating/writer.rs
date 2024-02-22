@@ -4,7 +4,7 @@ use std::io::Write;
 use crate::error::*;
 use crate::generating::llvm::LLVMValue;
 
-use super::{Constant, RegisterFormat, VirtualRegister};
+use super::{Constant, Label, RegisterFormat, VirtualRegister};
 
 #[derive(Debug)]
 pub struct Writer {
@@ -151,6 +151,21 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 	// Compare left and right via 'op'
 	pub fn write_cmp(&mut self, left: &LLVMValue, right: &LLVMValue, reg: u32, op: String) -> Result<()> {
 		self.writeln(&format!("\t%{reg} = icmp {op} {} {left}, {right}", left.val_type()))
+	}
+
+	// Write given label to output
+	pub fn write_label(&mut self, label: &Label) -> Result<()> {
+		self.writeln(&format!("{label}:"))
+	}
+
+	// Write a conditional branch statement, true label, and false label
+	pub fn write_cond_branch(&mut self, condition: &LLVMValue, t_label: &Label, f_label: &Label) -> Result<()> {
+		self.writeln(&format!("\tbr {cond_type} {condition}, label %{t_label}, label %{f_label}", cond_type=condition.val_type()))
+	}
+
+	// Write a direct branch to a label
+	pub fn write_branch(&mut self, label: &Label) -> Result<()> {
+		self.writeln(&format!("\tbr label %{label}"))
 	}
 
 	// Print integer (i32)

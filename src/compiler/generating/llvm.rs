@@ -131,8 +131,8 @@ impl RegisterFormat {
 	}
 
 	pub fn can_compare_to(&self, other: &RegisterFormat, op: &Token) -> bool {
-		match (self, other) {
-			(RegisterFormat::Integer, RegisterFormat::Integer) => true,
+		match (self, op, other) {
+			(RegisterFormat::Integer, _, RegisterFormat::Integer) => true,
 			_ => false,
 		}
 	}
@@ -318,5 +318,23 @@ impl SymbolTable {
 		let pointer = VirtualRegister::new(name.to_owned(), format.to_pointer());
 
 		(symbol, pointer)
+	}
+}
+
+pub struct Label {
+	id: String,
+}
+
+impl Label {
+	pub fn new(id: u32) -> Self {
+		Self {
+			id: format!("label.{id}")
+		}
+	}
+}
+
+impl fmt::Display for Label {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.id)
 	}
 }

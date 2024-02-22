@@ -5,6 +5,8 @@ pub enum Token {
 	EndOfFile,
 	None,
 	Literal(Literal),
+	LeftCurly,
+	RightCurly,
 	Plus,
 	Minus,
 	Asterisk,
@@ -46,6 +48,8 @@ impl fmt::Display for Token {
 			Token::EndOfFile => write!(f, "EOF"),
 			Token::None => write!(f, "None"),
 			Token::Literal(_) => write!(f, "Literal"),
+			Token::LeftCurly => write!(f, "{{"),
+			Token::RightCurly => write!(f, "}}"),
 			Token::Plus => write!(f, "+"),
 			Token::Minus => write!(f, "-"),
 			Token::Asterisk => write!(f, "*"),
@@ -66,6 +70,8 @@ impl fmt::Display for Token {
 pub enum Identifier {
 	Let,
 	Print,
+	If,
+	Else,
 	Symbol(String),
 }
 
@@ -74,6 +80,8 @@ impl fmt::Display for Identifier {
 		match self {
 			Identifier::Print => write!(f, "print"),
 			Identifier::Let => write!(f, "let"),
+			Identifier::If => write!(f, "if"),
+			Identifier::Else => write!(f, "else"),
 			Identifier::Symbol(s) => write!(f, "{s}"),
 		}
 	}
@@ -82,6 +90,8 @@ impl fmt::Display for Identifier {
 pub const IDENTIFIER_SYMBOLS: &[(&str, Identifier)] = &[
 	("let", Identifier::Let),
 	("print", Identifier::Print),
+	("if", Identifier::If),
+	("else", Identifier::Else),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,6 +101,8 @@ pub enum Literal {
 }
 
 pub const TOKEN_SYMBOLS: &[(&str, Token)] = &[
+	("{", Token::LeftCurly),
+	("}", Token::RightCurly),
 	("+", Token::Plus),
 	("-", Token::Minus),
 	("*", Token::Asterisk),

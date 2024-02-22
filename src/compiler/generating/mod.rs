@@ -14,6 +14,7 @@ pub struct Generator {
 	writer: Writer,
 	next_register: u32,
 	free_register_count: u32,
+	label_count: u32,
 	symbol_table: SymbolTable,
 }
 
@@ -23,6 +24,7 @@ impl Generator {
 			writer,
 			next_register: 1,
 			free_register_count: 0,
+			label_count: 0,
 			symbol_table: SymbolTable::new(64),
 		}
 	}
@@ -67,6 +69,13 @@ impl Generator {
 		self.next_register - amt
 	}
 
+	// Update label count and return count prior to update
+	pub fn update_label_count(&mut self, amt: u32) -> u32 {
+		self.label_count += amt;
+
+		self.label_count - amt
+	}
+
 	// Claim free register from available free registers
 	pub fn claim_free_register(&mut self) -> u32 {
 		self.free_register_count -= 1;
@@ -80,6 +89,7 @@ impl Generator {
 			ASTNode::Literal(x) => Ok(self.generate_literal(x)?),
 			ASTNode::Binary {token, left, right} => Ok(self.generate_binary(token, *(*left).clone(), *(*right).clone())?),
 			ASTNode::Let { name, value } => Ok(self.generate_let(name, value)?),
+			ASTNode::If { expr, block, else_block } => Ok(self.generate_if(expr, block, else_block)?),
 			ASTNode::Print { expr } => Ok(self.generate_print(expr)?),
 		}
 
@@ -195,6 +205,58 @@ impl Generator {
 			let (symbol, reg) = self.symbol_table.create_local(name, &RegisterFormat::Integer);
 			self.writer.write_local_alloc(&reg, &RegisterFormat::Integer)?;
 			self.symbol_table.insert(symbol);
+		}
+
+		Ok(LLVMValue::None)
+	}
+
+	// Generate if statement
+	pub fn generate_if(&mut self, expr: &ASTNode, block: &Vec<ASTNode>, else_block: &Option<Vec<ASTNode>>) -> Result<LLVMValue> {
+		let expr_llvm = self.ast_to_llvm(expr)?;
+		expr_llvm.format().expect(&RegisterFormat::Boolean)?;
+
+		// Generate a label for if branch.
+		// If else is present, generate an else label, emit conditional branch with body label and else label, and parse blocks
+		// Else, emit conditional branch with body label and tail label, and parse only body block
+		let body_label = Label::new(self.update_label_count(1));
+		if let Some(else_block) = else_block {
+			let else_label = Label::new(self.update_label_count(1));
+			let tail_label = Label::new(self.update_label_count(1));
+
+			self.writer.write_cond_branch(&expr_llvm, &body_label, &else_label)?;
+
+			// Write body portion of if statement
+			self.writer.write_label(&body_label)?;
+
+			for block_statement in block {
+				self.ast_to_llvm(block_statement)?;
+			}
+
+			self.writer.write_branch(&tail_label)?;
+			
+			// Write else portion
+			self.writer.write_label(&else_label)?;
+			for else_statement in else_block {
+				self.ast_to_llvm(else_statement)?;
+			}
+
+			self.writer.write_branch(&tail_label)?;
+			self.writer.write_label(&tail_label)?;
+		} else {
+			// No else statement
+			let tail_label = Label::new(self.update_label_count(1));
+
+			self.writer.write_cond_branch(&expr_llvm, &body_label, &tail_label)?;
+
+			// Body portion
+			self.writer.write_label(&body_label)?;
+
+			for block_statement in block {
+				self.ast_to_llvm(block_statement)?;
+			}
+
+			self.writer.write_branch(&tail_label)?;
+			self.writer.write_label(&tail_label)?;
 		}
 
 		Ok(LLVMValue::None)

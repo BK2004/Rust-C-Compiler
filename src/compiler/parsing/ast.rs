@@ -10,5 +10,10 @@ pub enum ASTNode {
 	Let { 
 		name: String,
 		value: Option<Box<ASTNode>>,
+	},
+	If {
+		expr: Box<ASTNode>,
+		block: Vec<ASTNode>,
+		else_block: Option<Vec<ASTNode>>,
 	}
 }

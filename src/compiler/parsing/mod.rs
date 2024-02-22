@@ -73,10 +73,17 @@ impl Parser {
 		}
 	}
 
+	// Verify that current token matches expected identifier
+	pub fn expect_identifier(&mut self, identifier: Identifier) -> Result<()> {
+		let matched_identifier = self.match_identifier()?;
+
+		if matched_identifier == identifier { Ok(()) } else { Err(Error::InvalidIdentifier { expected: [identifier].to_vec(), received: matched_identifier })}
+	}
+
 	// Parse a statement, which for now contains an identifier followed by a binary expression followed by a semicolon
 	pub fn parse_statement(&mut self) -> Result<Option<ASTNode>> {
 		// If EOF, None should be returned
-		if let Some(Token::EndOfFile) = self.current_token {
+		if self.match_token(&[Token::EndOfFile, Token::RightCurly]).is_ok() {
 			return Ok(None)
 		}
 
@@ -123,6 +130,20 @@ impl Parser {
 					_ => Err(Error::InvalidIdentifier { expected: [Identifier::Symbol("".to_string())].to_vec(), received: id })
 				}
 			},
+			Identifier::If => {
+				// Follows 'if <expr> <block>'
+				// Should get a boolean expression after if;
+				let expr = Box::new(self.parse_binary_operation(0)?);
+
+				// Parse a block statement and error if there isn't one
+				let block = self.parse_block_statement()?;
+				let is_else = self.expect_identifier(Identifier::Else).is_ok();
+				self.scan_next()?;
+
+				let else_block: Option<Vec<ASTNode>> = if is_else { Some(self.parse_block_statement()?) } else { None };
+
+				Ok(ASTNode::If { expr, block, else_block })
+			},
 			Identifier::Symbol(_) => {
 				// Should match <symbol> = <value>;
 				let token = self.match_token(&[Token::Equals])?;
@@ -134,7 +155,7 @@ impl Parser {
 
 				Ok(ASTNode::Binary { token, left: Box::new(ASTNode::Literal(Literal::Identifier(identifier.clone()))), right: val })
 			},
-			_ => Err(Error::InvalidIdentifier { received: identifier, expected: [Identifier::Print, Identifier::Let, Identifier::Symbol("".to_string())].to_vec() }),
+			_ => Err(Error::InvalidIdentifier { received: identifier, expected: [Identifier::If, Identifier::Print, Identifier::Let, Identifier::Symbol("".to_string())].to_vec() }),
 		}?))
 	}
 
@@ -174,8 +195,10 @@ impl Parser {
 		}
 
 		if let Token::EndOfFile = token {
-			return Err(Error::InvalidToken { expected: [Token::Semicolon].to_vec(), received: Token::EndOfFile });
-		} else if let Token::Semicolon = token {
+			return Err(Error::InvalidToken { expected: [Token::Semicolon, Token::LeftCurly, Token::RightCurly].to_vec(), received: Token::EndOfFile });
+		} 
+		
+		if self.match_token(&[Token::Semicolon, Token::LeftCurly, Token::RightCurly]).is_ok() {
 			return Ok(left);
 		}
 
@@ -192,7 +215,9 @@ impl Parser {
 			// If EOF reached, return the new left
 			if let Some(Token::EndOfFile) = self.current_token {
 				return Ok(left);
-			} else if let Some(Token::Semicolon) = self.current_token {
+			}
+			
+			if self.match_token(&[Token::Semicolon, Token::LeftCurly, Token::RightCurly]).is_ok() {
 				return Ok(left);
 			}
 
@@ -203,5 +228,25 @@ impl Parser {
 		}
 
 		Ok(left)
+	}
+
+	pub fn parse_block_statement(&mut self) -> Result<Vec<ASTNode>> {
+		// Follows '{ <statement> <statement> ... }'
+		self.match_token(&[Token::LeftCurly])?;
+		self.scan_next()?;
+		let mut statements = Vec::new();
+
+		while self.current_token != Some(Token::RightCurly) {
+			let statement = self.parse_statement()?;
+			if let Some(node) = statement {
+				statements.push(node);
+			} else {
+				return Err(Error::UnexpectedEOF { expected: Token::RightCurly });
+			}
+		}
+
+		self.scan_next()?;
+
+		Ok(statements)
 	}
 }

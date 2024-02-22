@@ -1,18 +1,20 @@
-// Assign bool to variable and print it
-let ne = 3 != 2;
-let eq = 3 == 2;
-let gt = 3 > 2;
-let ge = 3 >= 2;
-let lt = 3 < 2;
-let le = 3 < 2;
+let x = 3;
+let y = 2;
+let a = x + y;
+let b = x - y;
 
-let xyz;
+if a > b {
+	print a;
 
-xyz = 6 < 2;
-
-print ne;
-print eq;
-print gt;
-print ge;
-print lt;
-print le;
+	if b - a > y {
+		print y;
+	} else {
+		if x > y {
+			print x;
+		} else {
+			print y;
+		}
+	}
+} else {
+	print b;
+}

@@ -147,6 +147,11 @@ impl Scanner {
 			}
 
 			while remaining_symbols.len() >= 1 {
+				// If current symbol matches only remaining, don't let it get removed due to mismatch
+				if remaining_symbols.len() == 1 && remaining_symbols[0].0 == curr {
+					break;
+				}
+
 				// If character is alphanumeric/whitespace or EOF reached, stop reading symbols
 				if let Some(next) = self.next_char()? {
 					c = next;
