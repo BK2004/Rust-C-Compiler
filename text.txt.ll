@@ -5,34 +5,25 @@ target triple = "x86_64-pc-linux-gnu"
 
 @print_int_fstring = private unnamed_addr constant [4 x i8] c"%d\0A\00", align 1
 
-; Function Attrs: noinline nounwind optnone uwtable
-define dso_local i32 @main() #0 {
-	%i = alloca i64
-	store i64 0, i64* %i
-	br label %label.0
-label.0:
-	%1 = load i64, i64* %i
-	%2 = icmp sle i64 %1, 10
-	br i1 %2, label %label.1, label %label.2
-label.1:
-	%3 = load i64, i64* %i
+define dso_local i64 @help(i64 %arg.0,i64 %arg.1,i64 %arg.2) #0 {
+	%x = alloca i64
+	store i64 %arg.0, i64* %x
+	%arcz = alloca i64
+	store i64 %arg.1, i64* %arcz
+	%sin = alloca i64
+	store i64 %arg.2, i64* %sin
+	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 3)
+}
+
+define dso_local i64 @mult(i64 %arg.0,i64 %arg.1) #0 {
+	%x = alloca i64
+	store i64 %arg.0, i64* %x
+	%y = alloca i64
+	store i64 %arg.1, i64* %y
+	%1 = load i64, i64* %x
+	%2 = load i64, i64* %y
+	%3 = mul nsw i64 %1, %2
 	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %3)
-	%5 = load i64, i64* %i
-	%6 = icmp slt i64 %5, 5
-	br i1 %6, label %label.3, label %label.4
-label.3:
-	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 444)
-	br label %label.5
-label.4:
-	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 555)
-	br label %label.5
-label.5:
-	%9 = load i64, i64* %i
-	%10 = add nsw i64 %9, 1
-	store i64 %10, i64* %i
-	br label %label.0
-label.2:
-	ret i32 0
 }
 
 declare i32 @printf(i8*, ...) #1

@@ -77,14 +77,61 @@ impl Parser {
 	pub fn expect_identifier(&mut self, identifier: Identifier) -> Result<()> {
 		let matched_identifier = self.match_identifier()?;
 
-		if matched_identifier == identifier { Ok(()) } else { Err(Error::InvalidIdentifier { expected: [identifier].to_vec(), received: matched_identifier })}
+		if std::mem::discriminant(&matched_identifier) == std::mem::discriminant(&identifier) { Ok(()) } else { Err(Error::InvalidIdentifier { expected: [identifier].to_vec(), received: matched_identifier })}
+	}
+
+	// Parse a global statement (function for now)
+	pub fn parse_global_statement(&mut self) -> Result<Option<ASTNode>> {
+		if self.match_token(&[Token::EndOfFile]).is_ok() {
+			return Ok(None);
+		}
+
+		// Should follow 'fn <name>(<param 1>, <param 2>, ...) { <body_block> }
+		self.expect_identifier(Identifier::Function)?;
+		self.scan_next()?;
+
+		self.expect_identifier(Identifier::Symbol("".to_string()))?;
+		let name = match self.match_identifier()? {
+			Identifier::Symbol(s) => s,
+			_ => "".to_string(),
+		};
+		self.scan_next()?;
+
+		self.match_token(&[Token::LeftParen])?;
+		self.scan_next()?;
+
+		let mut param_list: Vec<FunctionParameter> = Vec::new();
+
+		// Parse parameters until right parenthesis is met; don't allow trailing comma
+		while self.expect_identifier(Identifier::Symbol("".to_string())).is_ok() {
+			let id = self.match_identifier()?;
+			self.scan_next()?;
+
+			if !self.match_token(&[Token::RightParen]).is_ok() {
+				self.match_token(&[Token::Comma])?;
+				self.scan_next()?;
+			}
+
+			// Add id to parameter list (guaranteed to run)
+			if let Identifier::Symbol(s) = id {
+				param_list.push(FunctionParameter { name: s, param_type: Type::Named { type_name: "int".to_string() }});
+			}
+		}
+
+		// Should be a right parenthesis
+		self.match_token(&[Token::RightParen])?;
+		self.scan_next()?;
+
+		let body_block: Vec<ASTNode> = self.parse_block_statement()?;
+
+		Ok(Some(ASTNode::FunctionDefinition { name, parameters: param_list, body_block, return_type: Type::Named { type_name: "int".to_string() } }))
 	}
 
 	// Parse a statement, which for now contains an identifier followed by a binary expression followed by a semicolon
 	pub fn parse_statement(&mut self) -> Result<Option<ASTNode>> {
 		// If EOF, None should be returned
 		if self.match_token(&[Token::EndOfFile, Token::RightCurly]).is_ok() {
-			return Ok(None)
+			return Ok(None);
 		}
 
 		// Statement should follow the pattern "<identifier> <binary_expr> ;"
@@ -121,10 +168,11 @@ impl Parser {
 								self.scan_next()?;
 								Ok(ASTNode::Let {
 									name: symbol,
+									val_type: None,
 									value: val
 								})
 							},
-							_ => Ok(ASTNode::Let { name: symbol, value: None })
+							_ => Ok(ASTNode::Let { name: symbol, val_type: None, value: None })
 						}
 					},
 					_ => Err(Error::InvalidIdentifier { expected: [Identifier::Symbol("".to_string())].to_vec(), received: id })

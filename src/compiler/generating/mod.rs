@@ -3,11 +3,16 @@ pub mod llvm;
 
 use crate::error::*;
 
-use crate::parsing::ast::ASTNode;
+use crate::parsing::ast::{ASTNode, FunctionParameter, Type};
 use crate::parsing::Parser;
 use crate::scanning::token::*;
 use llvm::*;
 use writer::Writer;
+
+pub const TYPE_FORMATS: &[(&str, RegisterFormat)] = &[
+	("bool", RegisterFormat::Boolean),
+	("int", RegisterFormat::Integer),
+];
 
 #[derive(Debug)]
 pub struct Generator {
@@ -15,7 +20,8 @@ pub struct Generator {
 	next_register: u32,
 	free_register_count: u32,
 	label_count: u32,
-	symbol_table: SymbolTable,
+	local_symbol_table: SymbolTable,
+	global_symbol_table: SymbolTable,
 }
 
 impl Generator {
@@ -25,7 +31,8 @@ impl Generator {
 			next_register: 1,
 			free_register_count: 0,
 			label_count: 0,
-			symbol_table: SymbolTable::new(64),
+			local_symbol_table: SymbolTable::new(64),
+			global_symbol_table: SymbolTable::new(64),
 		}
 	}
 
@@ -43,18 +50,22 @@ impl Generator {
 		self.next_register
 	}
 
-	pub fn symbol_table(&self) -> &SymbolTable {
-		&self.symbol_table
+	pub fn local_symbol_table(&self) -> &SymbolTable {
+		&self.local_symbol_table
+	}
+
+	pub fn global_symbol_table(&self) -> &SymbolTable {
+		&self.global_symbol_table
 	}
 
 	pub fn generate(&mut self, parser: &mut Parser) -> Result<()> {
 		self.writer.write_preamble()?;
 
 		// Allocate variable stack space and write to output
-		while let Some(statement) = parser.parse_statement()? {
+		while let Some(function) = parser.parse_global_statement()? {
 			self.free_register_count = self.next_register - 1;
 
-			self.ast_to_llvm(&statement)?;
+			self.ast_to_llvm(&function)?;
 		}
 
 		self.writer.write_postamble()?;
@@ -88,9 +99,10 @@ impl Generator {
 		match root {
 			ASTNode::Literal(x) => Ok(self.generate_literal(x)?),
 			ASTNode::Binary {token, left, right} => Ok(self.generate_binary(token, *(*left).clone(), *(*right).clone())?),
-			ASTNode::Let { name, value } => Ok(self.generate_let(name, value)?),
+			ASTNode::Let { name, val_type, value } => Ok(self.generate_let(name, val_type, value)?),
 			ASTNode::If { expr, block, else_block } => Ok(self.generate_if(expr, block, else_block)?),
 			ASTNode::While { expr, block } => Ok(self.generate_while(expr, block)?),
+			ASTNode::FunctionDefinition { name, parameters, body_block, return_type } => Ok(self.generate_function(name.to_owned(), parameters, body_block, return_type)?),
 			ASTNode::Print { expr } => Ok(self.generate_print(expr)?),
 		}
 
@@ -101,7 +113,7 @@ impl Generator {
 		match literal {
 			Literal::Integer(x) => Ok(LLVMValue::Constant(Constant::Integer(*x))),
 			Literal::Identifier(i) => match i {
-				Identifier::Symbol(x) => Ok(LLVMValue::VirtualRegister(VirtualRegister::from_identifier(x.to_owned(), i.to_owned(), self.symbol_table())?)),
+				Identifier::Symbol(x) => Ok(LLVMValue::VirtualRegister(VirtualRegister::from_identifier(x.to_owned(), i.to_owned(), true, self.local_symbol_table())?)),
 				_ => Err(Error::TerminalTokenExpected { received_token: None, received_identifier: Some(i.clone()) })
 			},
 		}
@@ -138,7 +150,7 @@ impl Generator {
 		let reg = self.update_virtual_register(1);
 		self.writer.write_mul(&left, &right, reg)?;
 
-		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer)))
+		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer, true)))
 	}
 
 	// Generate LLVMValue for subtraction
@@ -148,7 +160,7 @@ impl Generator {
 		let reg = self.update_virtual_register(1);
 		self.writer.write_sub(&left, &right, reg)?;
 
-		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer)))
+		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer, true)))
 	}
 
 	// Generate LLVMValue for addition
@@ -158,7 +170,7 @@ impl Generator {
 		let reg = self.update_virtual_register(1);
 		self.writer.write_add(&left, &right, reg)?;
 
-		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer)))
+		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer, true)))
 	}
 
 	// Generate LLVMValue for division
@@ -167,14 +179,13 @@ impl Generator {
 		let reg = self.update_virtual_register(1);
 		self.writer.write_div(&left, &right, reg)?;
 
-		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer)))
+		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Integer, true)))
 	}
 
 	// Generate LLVMValue for assignment of left = right
 	pub fn generate_assign(&mut self, left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
 		// Make right an operand, assign it to left, and return left for use again
 		self.ensure_literals(&mut[&mut right])?;
-		println!("{}:{} :: {}", left.format(), right.format(), left.format() == right.format());
 		left.format().expect(right.format())?;
 		self.writer.write_store(&right, &left)?;
 		Ok(left)
@@ -188,25 +199,25 @@ impl Generator {
 		let reg = self.update_virtual_register(1);
 		self.writer.write_cmp(&left, &right, reg, pnemonic)?;
 		
-		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Boolean)))
+		Ok(LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Boolean, true)))
 	}
 
-	pub fn generate_let(&mut self, name: &String, value: &Option<Box<ASTNode>>) -> Result<LLVMValue> {
-		if let Ok(_) = self.symbol_table.get(name) {
+	pub fn generate_let(&mut self, name: &String, val_type: &Option<Type>, value: &Option<Box<ASTNode>>) -> Result<LLVMValue> {
+		if let Ok(_) = self.local_symbol_table.get(name) {
 			return Err(Error::SymbolDeclared { name: name.to_owned() });
 		}
 
 		if let Some(val) = value {
 			let assigned_llvm = self.ast_to_llvm(&val)?;
-			let (symbol, reg) = self.symbol_table.create_local(name, &assigned_llvm.format());
+			let (symbol, reg) = self.local_symbol_table.create_local(name, &assigned_llvm.format());
 			self.writer.write_local_alloc(&reg, &assigned_llvm.format())?;
 			self.writer.write_store(&assigned_llvm, &LLVMValue::VirtualRegister(reg))?;
-			self.symbol_table.insert(symbol);
+			self.local_symbol_table.insert(symbol);
 		} else {
 			// No value assigned; allocate an int
-			let (symbol, reg) = self.symbol_table.create_local(name, &RegisterFormat::Integer);
+			let (symbol, reg) = self.local_symbol_table.create_local(name, &RegisterFormat::Integer);
 			self.writer.write_local_alloc(&reg, &RegisterFormat::Integer)?;
-			self.symbol_table.insert(symbol);
+			self.local_symbol_table.insert(symbol);
 		}
 
 		Ok(LLVMValue::None)
@@ -288,6 +299,38 @@ impl Generator {
 		Ok(LLVMValue::None)
 	}
 
+	// Generate a function, including header and body
+	pub fn generate_function(&mut self, name: String, parameters: &Vec<FunctionParameter>, body_block: &Vec<ASTNode>, return_type: &Type) -> Result<LLVMValue> {
+		let return_fmt = self.get_format_from_type(return_type)?;
+		let mut param_values: Vec<LLVMValue> = Vec::new();
+		for (_, param) in parameters.iter().enumerate() {
+			param_values.push(LLVMValue::VirtualRegister(VirtualRegister::new(param.name.to_owned(), self.get_format_from_type(&param.param_type)?, true)));
+		}
+
+		// Write function header, convert args into locals, generate the block statements, and close function definition
+		self.writer.write_function_header(&name, &param_values, &return_fmt)?;
+
+		for (i, param) in param_values.iter().enumerate() {
+			let arg_reg = VirtualRegister::new("arg.".to_owned() + &i.to_string(), param.format(), true);
+			let (local_symbol, local_reg) = self.local_symbol_table.create_local(&parameters[i].name, &param.format());
+
+			self.writer.write_local_alloc(&local_reg, &param.format())?;
+			self.writer.write_store(&LLVMValue::VirtualRegister(arg_reg), &LLVMValue::VirtualRegister(VirtualRegister::new(parameters[i].name.to_owned(), local_symbol.value().format().to_pointer(), true)))?;
+			self.local_symbol_table.insert(local_symbol);
+		}
+
+		for block_statement in body_block {
+			self.ast_to_llvm(block_statement)?;
+		}
+
+		self.writer.write_function_close()?;
+		self.free_register_count = 0;
+		self.next_register = 1;
+		self.local_symbol_table.clear();
+
+		Ok(LLVMValue::None)
+	}
+
 	// Generate print statement
 	pub fn generate_print(&mut self, expr: &ASTNode) -> Result<LLVMValue> {
 		let mut val = self.ast_to_llvm(expr)?;
@@ -306,13 +349,13 @@ impl Generator {
 	pub fn load_numbered_register(&mut self, format: RegisterFormat, val: LLVMValue) -> Result<LLVMValue> {
 		if let LLVMValue::VirtualRegister(_) = &val {
 			let reg = self.update_virtual_register(1);
-			let reg_val = VirtualRegister::new(reg.to_string(), format);
+			let reg_val = VirtualRegister::new(reg.to_string(), format, true);
 
 			self.writer.write_load(&val.clone(), &reg_val)?;
 
 			Ok(LLVMValue::VirtualRegister(reg_val))
 		} else {
-			Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: val })
+			Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer, true)), received: val })
 		}
 	}
 
@@ -372,23 +415,16 @@ impl Generator {
 		Ok(())
 	}
 
-	// Interpret an AST recursively
-	pub fn interpret_ast(&self, node: &crate::parsing::ast::ASTNode) -> Result<i64> {
-		match node {
-			ASTNode::Literal(Literal::Integer(x)) => Ok(*x),
-			ASTNode::Binary{token, left, right} => {
-				let left_res = self.interpret_ast(&left)?;
-				let right_res = self.interpret_ast(&right)?;
-	
-				return match token {
-					Token::Asterisk => Ok(left_res * right_res),
-					Token::Minus => Ok(left_res - right_res),
-					Token::Plus => Ok(left_res + right_res),
-					Token::Slash => Ok(left_res / right_res),
-					_ => Err(Error::BinaryOperatorExpected { received: token.clone() })
-				};
-			},
-			_ => Err(Error::UnexpectedEOF { expected: Token::Semicolon }) // interpreter is solely for the purpose of binary expressions
+	pub fn get_format_from_type(&mut self, source: &Type) -> Result<RegisterFormat> {
+		let fmt = match source {
+			Type::Named { type_name } => {
+				TYPE_FORMATS.iter().find_map(|type_fmt| if type_name == type_fmt.0 { Some(type_fmt.1.clone()) } else { None }  )
+			}
+		};
+
+		match fmt {
+			Some(type_format) => Ok(type_format),
+			None => Err(Error::TypeUnknown { received: source.to_owned() }),
 		}
 	}
 }

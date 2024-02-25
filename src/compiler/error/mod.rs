@@ -1,5 +1,6 @@
 use std::{fmt, result};
 
+use crate::parsing::ast::Type;
 use crate::scanning::token::{Identifier, Token};
 use crate::generating::llvm::{LLVMValue, RegisterFormat};
 
@@ -27,6 +28,7 @@ pub enum Error {
 	InvalidArithmeticOperand { received: RegisterFormat },
 	InvalidComparisonOperands { left: RegisterFormat, right: RegisterFormat },
 	InvalidAssignment { received: RegisterFormat, expected: RegisterFormat },
+	TypeUnknown { received: Type },
 }
 
 impl fmt::Display for Error {
@@ -91,6 +93,7 @@ impl fmt::Display for Error {
 			Error::InvalidArithmeticOperand { received } => write!(f, "InvalidArithmeticOperand: Attempted to perform arithmetic on {received}"),
 			Error::InvalidComparisonOperands { left, right } => write!(f, "InvalidComparisonOperands: Attempted to compare {left} and {right}"),
 			Error::InvalidAssignment { received, expected } => write!(f, "InvalidAssigment: Attempted to assign {received} to {expected}"),
+			Error::TypeUnknown { received } => write!(f, "TypeUnknown: '{received}'"),
 		}
 	}
 }

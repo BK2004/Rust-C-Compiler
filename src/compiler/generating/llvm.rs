@@ -69,17 +69,19 @@ impl fmt::Display for Constant {
 pub struct VirtualRegister {
 	id: String,
 	format: RegisterFormat,
+	is_local: bool,
 }
 
 impl VirtualRegister {
-	pub fn new(id: String, format: RegisterFormat) -> Self {
+	pub fn new(id: String, format: RegisterFormat, is_local: bool) -> Self {
 		Self {
 			id,
 			format,
+			is_local,
 		}
 	}
 
-	pub fn from_identifier(id: String, identifier: Identifier, symbol_table: &SymbolTable) -> Result<Self> {
+	pub fn from_identifier(id: String, identifier: Identifier, is_local: bool, symbol_table: &SymbolTable) -> Result<Self> {
 		Ok(Self {
 			id,
 			format: match &identifier {
@@ -89,7 +91,8 @@ impl VirtualRegister {
 					}
 				},
 				_ => Err(Error::InvalidIdentifier { expected: [Identifier::Symbol("".to_string())].to_vec(), received: identifier })?
-			}
+			},
+			is_local,
 		})
 	}
 
@@ -101,6 +104,10 @@ impl VirtualRegister {
 		&self.format
 	}
 
+	pub fn is_local(&self) -> bool {
+		self.is_local
+	}
+
 	pub fn reg_type(&self) -> String {
 		self.format.format_type()
 	}
@@ -108,7 +115,11 @@ impl VirtualRegister {
 
 impl fmt::Display for VirtualRegister {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "%{}", self.id())
+		if self.is_local() {
+			write!(f, "%{}", self.id())
+		} else {
+			write!(f, "@{}", self.id())
+		}
 	}
 }
 
@@ -295,6 +306,15 @@ impl SymbolTable {
 		}
 	}
 
+	pub fn clear(&mut self) {
+		for i in 0..self.len() {
+			while self.buckets[i].is_some() {
+				let next = self.buckets[i].as_mut().unwrap().next.take();
+				self.buckets[i] = next;
+			}
+		}
+	}
+
 	pub fn hash(&self, name: &str) -> usize {
 		let len = self.len() as u64;
 		let prime: u64 = 67;
@@ -310,12 +330,12 @@ impl SymbolTable {
 	}
 
 	pub fn create_local(&self, name: &String, format: &RegisterFormat) -> (Symbol, VirtualRegister) {
-		let value = VirtualRegister::new(name.to_owned(), format.clone());
+		let value = VirtualRegister::new(name.to_owned(), format.clone(), true);
 		let symbol = Symbol::Local {
 			name: name.to_owned(),
 			value: LLVMValue::VirtualRegister(value.clone()),
 		};
-		let pointer = VirtualRegister::new(name.to_owned(), format.to_pointer());
+		let pointer = VirtualRegister::new(name.to_owned(), format.to_pointer(), true);
 
 		(symbol, pointer)
 	}

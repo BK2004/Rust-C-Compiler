@@ -35,8 +35,6 @@ target triple = \"x86_64-pc-linux-gnu\"
 
 @print_int_fstring = private unnamed_addr constant [4 x i8] c\"%d\\0A\\00\", align 1
 
-; Function Attrs: noinline nounwind optnone uwtable
-define dso_local i32 @main() #0 {{
 ", self.filename
 		))?;
 
@@ -45,10 +43,7 @@ define dso_local i32 @main() #0 {{
 
 	pub fn write_postamble(&mut self) -> Result<()> {
 		self.write(
-&format!("\tret i32 0
-}}
-
-declare i32 @printf(i8*, ...) #1
+&format!("declare i32 @printf(i8*, ...) #1
 
 attributes #0 = {{ noinline nounwind optnone uwtable \"frame-pointer\"=\"all\" \"min-legal-vector-width\"=\"0\" \"no-trapping-math\"=\"true\" \"stack-protector-buffer-size\"=\"8\" \"target-cpu\"=\"x86-64\" \"target-features\"=\"+cx8,+fxsr,+mmx,+sse,+sse2,+x87\" \"tune-cpu\"=\"generic\" }}
 attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"stack-protector-buffer-size\"=\"8\" \"target-cpu\"=\"x86-64\" \"target-features\"=\"+cx8,+fxsr,+mmx,+sse,+sse2,+x87\" \"tune-cpu\"=\"generic\" }}
@@ -85,13 +80,13 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 		let l_val: String = match left {
 			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
 			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
-			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer, true)), received: left.clone() })
 		}?;
 
 		let r_val: String = match right {
 			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
 			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
-			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer, true)), received: left.clone() })
 		}?;
 
 		self.writeln(&format!("\t%{reg} = mul nsw {} {l_val}, {r_val}", left.val_type()))
@@ -102,13 +97,13 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 		let l_val: String = match left {
 			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
 			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
-			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer, true)), received: left.clone() })
 		}?;
 
 		let r_val: String = match right {
 			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
 			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
-			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer, true)), received: left.clone() })
 		}?;
 
 		self.writeln(&format!("\t%{reg} = sub nsw {} {l_val}, {r_val}", left.val_type()))
@@ -119,13 +114,13 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 		let l_val: String = match left {
 			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
 			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
-			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer, true)), received: left.clone() })
 		}?;
 
 		let r_val: String = match right {
 			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
 			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
-			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer, true)), received: left.clone() })
 		}?;
 
 		self.writeln(&format!("\t%{reg} = add nsw {} {l_val}, {r_val}", left.val_type()))
@@ -136,13 +131,13 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 		let l_val: String = match left {
 			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
 			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
-			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer, true)), received: left.clone() })
 		}?;
 
 		let r_val: String = match right {
 			LLVMValue::VirtualRegister(l) => Ok(l.to_string()),
 			LLVMValue::Constant(Constant::Integer(x)) => Ok(x.to_string()),
-			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer)), received: left.clone() })
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer, true)), received: left.clone() })
 		}?;
 
 		self.writeln(&format!("\t%{reg} = udiv {} {l_val}, {r_val}", left.val_type()))
@@ -166,6 +161,23 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 	// Write a direct branch to a label
 	pub fn write_branch(&mut self, label: &Label) -> Result<()> {
 		self.writeln(&format!("\tbr label %{label}"))
+	}
+
+	// Write function header
+	pub fn write_function_header(&mut self, name: &str, param_values: &Vec<LLVMValue>, return_fmt: &RegisterFormat) -> Result<()> {
+		self.write(&format!("define dso_local {return_type} @{name}(", return_type=return_fmt.format_type()))?;
+
+		for (i, param) in param_values.iter().enumerate() {
+			self.write(&format!("{param_type} %arg.{i}{comma}", param_type=param.val_type(), comma={if i < param_values.len() - 1 { "," } else { "" }}))?;
+		}
+
+		self.writeln(") #0 {")
+	}
+
+	// Write function close
+	pub fn write_function_close(&mut self) -> Result<()> {
+		self.writeln("}")?;
+		self.writeln("")
 	}
 
 	// Print integer (i32)

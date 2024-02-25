@@ -140,6 +140,7 @@ impl Scanner {
 			// Generate possible symbols that c represents
 			let mut remaining_symbols: Vec<&(&str, Token)> = Vec::new();
 			let mut curr: String = String::from(c);
+			
 			for (_, symbol) in TOKEN_SYMBOLS.iter().enumerate() {
 				if symbol.0.chars().nth(0).unwrap() == c {
 					remaining_symbols.push(symbol);

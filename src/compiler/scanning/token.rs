@@ -7,11 +7,14 @@ pub enum Token {
 	Literal(Literal),
 	LeftCurly,
 	RightCurly,
+	LeftParen,
+	RightParen,
 	Plus,
 	Minus,
 	Asterisk,
 	Slash,
 	Semicolon,
+	Comma,
 	Equals,
 	Equals2,
 	ExclamationEqual,
@@ -50,11 +53,14 @@ impl fmt::Display for Token {
 			Token::Literal(_) => write!(f, "Literal"),
 			Token::LeftCurly => write!(f, "{{"),
 			Token::RightCurly => write!(f, "}}"),
+			Token::LeftParen => write!(f, "("),
+			Token::RightParen => write!(f, ")"),
 			Token::Plus => write!(f, "+"),
 			Token::Minus => write!(f, "-"),
 			Token::Asterisk => write!(f, "*"),
 			Token::Slash => write!(f, "/"),
 			Token::Semicolon => write!(f, ";"),
+			Token::Comma => write!(f, ","),
 			Token::Equals => write!(f, "="),
 			Token::Equals2 => write!(f, "=="),
 			Token::ExclamationEqual => write!(f, "!="),
@@ -73,6 +79,7 @@ pub enum Identifier {
 	If,
 	Else,
 	While,
+	Function,
 	Symbol(String),
 }
 
@@ -84,6 +91,7 @@ impl fmt::Display for Identifier {
 			Identifier::If => write!(f, "if"),
 			Identifier::Else => write!(f, "else"),
 			Identifier::While => write!(f, "while"),
+			Identifier::Function => write!(f, "fn"),
 			Identifier::Symbol(s) => write!(f, "{s}"),
 		}
 	}
@@ -95,6 +103,7 @@ pub const IDENTIFIER_SYMBOLS: &[(&str, Identifier)] = &[
 	("if", Identifier::If),
 	("else", Identifier::Else),
 	("while", Identifier::While),
+	("fn", Identifier::Function),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,11 +115,14 @@ pub enum Literal {
 pub const TOKEN_SYMBOLS: &[(&str, Token)] = &[
 	("{", Token::LeftCurly),
 	("}", Token::RightCurly),
+	("(", Token::LeftParen),
+	(")", Token::RightParen),
 	("+", Token::Plus),
 	("-", Token::Minus),
 	("*", Token::Asterisk),
 	("/", Token::Slash),
 	(";", Token::Semicolon),
+	(",", Token::Comma),
 	("=", Token::Equals),
 	("==", Token::Equals2),
 	("!=", Token::ExclamationEqual),
