@@ -203,6 +203,12 @@ impl Parser {
 
 				Ok(ASTNode::While { expr, block })
 			},
+			Identifier::Return => {
+				let return_val = Box::new(self.parse_binary_operation(0)?);
+				self.scan_next()?;
+
+				Ok(ASTNode::Return { return_val })
+			},
 			Identifier::Symbol(_) => {
 				// Should match <symbol> = <value>;
 				let token = self.match_token(&[Token::Equals])?;

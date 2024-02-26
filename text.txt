@@ -1,7 +1,24 @@
-fn help (x, arcz, sin) {
+fn help (x, z) {
 	print 3;
+
+	if x < z {
+		return x;
+	} else {
+		return z;
+	}
+	return 0;
 }
 
 fn mult(x, y) {
-	print x * y;
+	let mult_res = x * y;
+
+	print mult_res;
+
+	return mult_res;
+}
+
+fn main() {
+	print 13;
+
+	return 0;
 }

@@ -103,6 +103,7 @@ impl Generator {
 			ASTNode::If { expr, block, else_block } => Ok(self.generate_if(expr, block, else_block)?),
 			ASTNode::While { expr, block } => Ok(self.generate_while(expr, block)?),
 			ASTNode::FunctionDefinition { name, parameters, body_block, return_type } => Ok(self.generate_function(name.to_owned(), parameters, body_block, return_type)?),
+			ASTNode::Return { return_val } => Ok(self.generate_return(return_val)?),
 			ASTNode::Print { expr } => Ok(self.generate_print(expr)?),
 		}
 
@@ -307,6 +308,8 @@ impl Generator {
 			param_values.push(LLVMValue::VirtualRegister(VirtualRegister::new(param.name.to_owned(), self.get_format_from_type(&param.param_type)?, true)));
 		}
 
+		let signature = FunctionSignature::new(&param_values.iter().map(|p| p.format()).collect(), return_fmt.clone());
+
 		// Write function header, convert args into locals, generate the block statements, and close function definition
 		self.writer.write_function_header(&name, &param_values, &return_fmt)?;
 
@@ -327,6 +330,25 @@ impl Generator {
 		self.free_register_count = 0;
 		self.next_register = 1;
 		self.local_symbol_table.clear();
+
+		let (func_symbol, _func_register) = self.global_symbol_table.create_function(&name, &signature);
+
+		self.global_symbol_table.insert(func_symbol);
+
+		Ok(LLVMValue::None)
+	}
+
+	// Generate a return statement
+	pub fn generate_return(&mut self, expr: &ASTNode) -> Result<LLVMValue> {
+		let mut val = self.ast_to_llvm(expr)?;
+		self.ensure_literals(&mut[&mut val])?;
+
+		if let LLVMValue::None = val {
+			return Err(Error::ExpressionExpected)
+		}
+
+		self.update_virtual_register(1);
+		self.writer.write_ret(&val)?;
 
 		Ok(LLVMValue::None)
 	}

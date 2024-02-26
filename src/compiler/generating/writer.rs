@@ -180,6 +180,11 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 		self.writeln("")
 	}
 
+	// Write a ret statement
+	pub fn write_ret(&mut self, val: &LLVMValue) -> Result<()> {
+		self.writeln(&format!("\tret {val_type} {val}", val_type=val.val_type()))
+	}
+
 	// Print integer (i32)
 	pub fn write_print(&mut self, val: &LLVMValue) -> Result<()> {
 		self.writeln(&format!("\tcall i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), {} {val})", val.val_type()))

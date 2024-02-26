@@ -124,6 +124,21 @@ impl fmt::Display for VirtualRegister {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionSignature {
+	params: Vec<RegisterFormat>,
+	return_fmt: Box<RegisterFormat>,
+}
+
+impl FunctionSignature {
+	pub fn new(params: &Vec<RegisterFormat>, return_fmt: RegisterFormat) -> Self {
+		Self {
+			params: params.clone(),
+			return_fmt: Box::new(return_fmt),
+		}
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegisterFormat {
 	Void,
 	Integer,
@@ -134,6 +149,9 @@ pub enum RegisterFormat {
 	Pointer {
 		pointee: Box<RegisterFormat>,
 	},
+	Function {
+		signature: FunctionSignature,
+	}
 }
 
 impl RegisterFormat {
@@ -155,6 +173,7 @@ impl RegisterFormat {
 			RegisterFormat::Integer => String::from("i64"),
 			RegisterFormat::Boolean => String::from("i1"),
 			RegisterFormat::Pointer { pointee } => String::from(format!("{}*", pointee.format_type())),
+			RegisterFormat::Function { .. } => String::from("function"),
 		}
 	}
 
@@ -175,6 +194,7 @@ impl fmt::Display for RegisterFormat {
 			RegisterFormat::Integer => write!(f, "int"),
 			RegisterFormat::Pointer { pointee } => write!(f, "{pointee}"),
 			RegisterFormat::Identifier { id_type } => write!(f, "{id_type}"),
+			RegisterFormat::Function { .. } => write!(f, "function"),
 		}
 	}
 }
@@ -185,18 +205,24 @@ pub enum Symbol {
 		name: String,
 		value: LLVMValue,
 	},
+	Function {
+		name: String,
+		value: LLVMValue,
+	}
 }
 
 impl Symbol {
 	pub fn name(&self) -> &str {
 		match self {
 			Symbol::Local { name, .. } => name.as_str(),
+			Symbol::Function { name, .. } => name.as_str(),
 		}
 	}
 
 	pub fn value(&self) -> &LLVMValue {
 		match self {
 			Symbol::Local { value, .. } => value,
+			Symbol::Function { value, .. } => value,
 		}
 	}
 }
@@ -330,14 +356,24 @@ impl SymbolTable {
 	}
 
 	pub fn create_local(&self, name: &String, format: &RegisterFormat) -> (Symbol, VirtualRegister) {
-		let value = VirtualRegister::new(name.to_owned(), format.clone(), true);
+		let reg = VirtualRegister::new(name.to_owned(), format.clone(), true);
 		let symbol = Symbol::Local {
 			name: name.to_owned(),
-			value: LLVMValue::VirtualRegister(value.clone()),
+			value: LLVMValue::VirtualRegister(reg.clone()),
 		};
 		let pointer = VirtualRegister::new(name.to_owned(), format.to_pointer(), true);
 
 		(symbol, pointer)
+	}
+
+	pub fn create_function(&self, name: &String, signature: &FunctionSignature) -> (Symbol, VirtualRegister) {
+		let reg = VirtualRegister::new(name.to_owned(), RegisterFormat::Function { signature: signature.to_owned() }, false);
+		let symbol = Symbol::Function {
+			name: name.to_owned(),
+			value: LLVMValue::VirtualRegister(reg.clone()),
+		};
+
+		(symbol, reg)
 	}
 }
 

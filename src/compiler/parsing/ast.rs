@@ -47,5 +47,8 @@ pub enum ASTNode {
 		parameters: Vec<FunctionParameter>,
 		body_block: Vec<ASTNode>,
 		return_type: Type,
+	},
+	Return {
+		return_val: Box<ASTNode>,
 	}
 }

@@ -80,6 +80,7 @@ pub enum Identifier {
 	Else,
 	While,
 	Function,
+	Return,
 	Symbol(String),
 }
 
@@ -92,6 +93,7 @@ impl fmt::Display for Identifier {
 			Identifier::Else => write!(f, "else"),
 			Identifier::While => write!(f, "while"),
 			Identifier::Function => write!(f, "fn"),
+			Identifier::Return => write!(f, "return"),
 			Identifier::Symbol(s) => write!(f, "{s}"),
 		}
 	}
@@ -104,6 +106,7 @@ pub const IDENTIFIER_SYMBOLS: &[(&str, Identifier)] = &[
 	("else", Identifier::Else),
 	("while", Identifier::While),
 	("fn", Identifier::Function),
+	("return", Identifier::Return),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
