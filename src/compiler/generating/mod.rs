@@ -104,6 +104,7 @@ impl Generator {
 			ASTNode::While { expr, block } => Ok(self.generate_while(expr, block)?),
 			ASTNode::FunctionDefinition { name, parameters, body_block, return_type } => Ok(self.generate_function(name.to_owned(), parameters, body_block, return_type)?),
 			ASTNode::Return { return_val } => Ok(self.generate_return(return_val)?),
+			ASTNode::FunctionCall { name, args } => Ok(self.generate_function_call(name, args)?),
 			ASTNode::Print { expr } => Ok(self.generate_print(expr)?),
 		}
 
@@ -146,7 +147,8 @@ impl Generator {
 
 	// Generate LLVMValue for multiplication
 	pub fn generate_mul(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
-		self.ensure_literals(&mut[&mut left, &mut right])?;
+		self.ensure_literal(&mut left)?;
+		self.ensure_literal(&mut right)?;
 		self.ensure_arithmetic_operands(&mut left, &mut right)?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_mul(&left, &right, reg)?;
@@ -156,7 +158,8 @@ impl Generator {
 
 	// Generate LLVMValue for subtraction
 	pub fn generate_sub(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
-		self.ensure_literals(&mut[&mut left, &mut right])?;
+		self.ensure_literal(&mut left)?;
+		self.ensure_literal(&mut right)?;
 		self.ensure_arithmetic_operands(&mut left, &mut right)?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_sub(&left, &right, reg)?;
@@ -166,7 +169,8 @@ impl Generator {
 
 	// Generate LLVMValue for addition
 	pub fn generate_add(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
-		self.ensure_literals(&mut[&mut left, &mut right])?;
+		self.ensure_literal(&mut left)?;
+		self.ensure_literal(&mut right)?;
 		self.ensure_arithmetic_operands(&mut left, &mut right)?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_add(&left, &right, reg)?;
@@ -186,7 +190,7 @@ impl Generator {
 	// Generate LLVMValue for assignment of left = right
 	pub fn generate_assign(&mut self, left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
 		// Make right an operand, assign it to left, and return left for use again
-		self.ensure_literals(&mut[&mut right])?;
+		self.ensure_literal(&mut right)?;
 		left.format().expect(right.format())?;
 		self.writer.write_store(&right, &left)?;
 		Ok(left)
@@ -322,6 +326,10 @@ impl Generator {
 			self.local_symbol_table.insert(local_symbol);
 		}
 
+		// Add to symbol table before parsing body so recursive functions can exist
+		let (func_symbol, _func_register) = self.global_symbol_table.create_function(&name, &signature);
+		self.global_symbol_table.insert(func_symbol);
+
 		for block_statement in body_block {
 			self.ast_to_llvm(block_statement)?;
 		}
@@ -331,17 +339,13 @@ impl Generator {
 		self.next_register = 1;
 		self.local_symbol_table.clear();
 
-		let (func_symbol, _func_register) = self.global_symbol_table.create_function(&name, &signature);
-
-		self.global_symbol_table.insert(func_symbol);
-
 		Ok(LLVMValue::None)
 	}
 
 	// Generate a return statement
 	pub fn generate_return(&mut self, expr: &ASTNode) -> Result<LLVMValue> {
 		let mut val = self.ast_to_llvm(expr)?;
-		self.ensure_literals(&mut[&mut val])?;
+		self.ensure_literal(&mut val)?;
 
 		if let LLVMValue::None = val {
 			return Err(Error::ExpressionExpected)
@@ -353,10 +357,50 @@ impl Generator {
 		Ok(LLVMValue::None)
 	}
 
+	// Generate a function call given name and args
+	pub fn generate_function_call(&mut self, name: &String, args: &Vec<ASTNode>) -> Result<LLVMValue> {
+		// Parse arguments
+		let mut arg_vals: Vec<LLVMValue> = Vec::new();
+		for node in args {
+			arg_vals.push(self.ast_to_llvm(node)?);
+		}
+
+		for (_, arg) in arg_vals.iter_mut().enumerate() {
+			self.ensure_literal(arg)?;
+		}
+
+		// Get function symbol and check that args match
+		let func_symbol = self.global_symbol_table.get(name)?.clone();
+		if let Symbol::Function { name, value } = func_symbol {
+			// existing function call, check arg types
+			if let RegisterFormat::Function { signature } = value.format() {
+				// Guaranteed if symbol is function
+				for (i, fmt) in signature.params().iter().enumerate() {
+					if !fmt.can_convert_to(&arg_vals.get(i).map_or(RegisterFormat::Void, |res| res.format())) {
+						return Err(Error::ArgumentMismatch { expected: signature, received: arg_vals })
+					}
+				}
+
+				// Generate new numbered register for call result
+				let ret_reg_num = self.update_virtual_register(1);
+				let ret_reg = LLVMValue::VirtualRegister(VirtualRegister::new(ret_reg_num.to_string(), signature.return_fmt().to_owned(), true));
+
+				self.writer.write_function_call(&name, &arg_vals, &ret_reg)?;
+
+				return Ok(ret_reg)
+			} else {
+				// this is just for Rust
+				return Ok(LLVMValue::None)
+			}
+		} else {
+			return Err(Error::ExpressionExpected)
+		}
+	}
+
 	// Generate print statement
 	pub fn generate_print(&mut self, expr: &ASTNode) -> Result<LLVMValue> {
 		let mut val = self.ast_to_llvm(expr)?;
-		self.ensure_literals(&mut[&mut val])?;
+		self.ensure_literal(&mut val)?;
 		
 		if let LLVMValue::None = val {
 			return Err(Error::ExpressionExpected)
@@ -382,8 +426,9 @@ impl Generator {
 	}
 
 	// Verify that LLVMValues are able to be operated on by arithmetic
-	pub fn ensure_arithmetic_operands(&mut self, left: &mut LLVMValue, right: &mut LLVMValue) -> Result<()> {
-		self.ensure_literals(&mut[left, right])?;
+	pub fn ensure_arithmetic_operands(&mut self, mut left: &mut LLVMValue, mut right: &mut LLVMValue) -> Result<()> {
+		self.ensure_literal(&mut left)?;
+		self.ensure_literal(&mut right)?;
 
 		if let RegisterFormat::Integer = left.format() {
 			if let RegisterFormat::Integer = right.format() {
@@ -397,8 +442,9 @@ impl Generator {
 	}
 
 	// Verify that left and right can be compared
-	pub fn ensure_comparison_operands(&mut self, left: &mut LLVMValue, right: &mut LLVMValue, op: &Token) -> Result<()> {
-		self.ensure_literals(&mut[left, right])?;
+	pub fn ensure_comparison_operands(&mut self, mut left: &mut LLVMValue, mut right: &mut LLVMValue, op: &Token) -> Result<()> {
+		self.ensure_literal(&mut left)?;
+		self.ensure_literal(&mut right)?;
 
 		let left_fmt = left.format();
 		let right_fmt = right.format();
@@ -411,28 +457,26 @@ impl Generator {
 	}
 
 	// Ensure that given LLVM Values are in operatable form
-	pub fn ensure_literals(&mut self, nodes: &mut [&mut LLVMValue]) -> Result<()> {
-		for (_, val) in nodes.iter_mut().enumerate() {
-			match val {
-				LLVMValue::None => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::Constant(Constant::Integer(3)), received: val.clone() }),
-				LLVMValue::VirtualRegister(r) => {
-					match r.format() {
-						RegisterFormat::Identifier { id_type } => {
-							**val = self.load_numbered_register(*id_type.to_owned(), val.clone())?;
+	pub fn ensure_literal(&mut self, node: &mut LLVMValue) -> Result<()> {
+		match node {
+			LLVMValue::None => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::Constant(Constant::Integer(3)), received: node.clone() }),
+			LLVMValue::VirtualRegister(r) => {
+				match r.format() {
+					RegisterFormat::Identifier { id_type } => {
+						*node = self.load_numbered_register(*id_type.to_owned(), node.clone())?;
 
-							Ok(())
-						}, 
-						RegisterFormat::Pointer { pointee } => {
-							**val = self.load_numbered_register(*pointee.clone(), val.clone())?;
+						Ok(())
+					}, 
+					RegisterFormat::Pointer { pointee } => {
+						*node = self.load_numbered_register(*pointee.clone(), node.clone())?;
 
-							Ok(())
-						},
-						_ => Ok(()),
-					}
-				},
-				_ => Ok(())
-			}?;
-		}
+						Ok(())
+					},
+					_ => Ok(()),
+				}
+			},
+			_ => Ok(())
+		}?;
 
 		Ok(())
 	}

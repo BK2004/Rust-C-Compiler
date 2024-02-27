@@ -38,6 +38,7 @@ impl Parser {
 	// Scan next token into parser
 	pub fn scan_next(&mut self) -> Result<()> {
 		let token = self.scanner.scan()?;
+		dbg!(&token);
 
 		self.current_token = token;
 		Ok(())
@@ -67,7 +68,7 @@ impl Parser {
 		match self.current_token.clone() {
 			Some(t) => match t {
 				Token::Literal(Literal::Identifier(i)) => Ok(i),
-				_ => Err(Error::IdentifierExpected { received: t }),
+				_ => {Err(Error::IdentifierExpected { received: t })},
 			},
 			None => Err(Error::IdentifierExpected { received: Token::None })
 		}
@@ -186,7 +187,9 @@ impl Parser {
 				// Parse a block statement and error if there isn't one
 				let block = self.parse_block_statement()?;
 				let is_else = self.expect_identifier(Identifier::Else).is_ok();
-				self.scan_next()?;
+				if is_else {
+					self.scan_next()?;
+				}
 
 				let else_block: Option<Vec<ASTNode>> = if is_else { Some(self.parse_block_statement()?) } else { None };
 
@@ -199,7 +202,6 @@ impl Parser {
 
 				// Parse a block statement and error if there isn't one
 				let block = self.parse_block_statement()?;
-				self.scan_next()?;
 
 				Ok(ASTNode::While { expr, block })
 			},
@@ -231,8 +233,31 @@ impl Parser {
 		};
 
 		match token {
-			Token::Literal(Literal::Integer(x)) => {self.current_token = self.scanner.scan()?; Ok(ASTNode::Literal(Literal::Integer(x)))},
-			Token::Literal(Literal::Identifier(Identifier::Symbol(c))) => {self.scan_next()?; Ok(ASTNode::Literal(Literal::Identifier(Identifier::Symbol(c))))}
+			Token::Literal(Literal::Integer(x)) => {self.scan_next()?; Ok(ASTNode::Literal(Literal::Integer(x)))},
+			Token::Literal(Literal::Identifier(Identifier::Symbol(c))) => {
+				self.scan_next()?;
+
+				// If a left parentheses follows, parse a function call
+				if self.match_token(&[Token::LeftParen]).is_ok() {
+					let mut arg_list: Vec<ASTNode> = Vec::new();
+					self.scan_next()?;
+
+					while self.match_token(&[Token::RightParen]).is_err() {
+						let expr = self.parse_binary_operation(0)?;
+						arg_list.push(expr);
+
+						if self.match_token(&[Token::RightParen]).is_err() {
+							self.match_token(&[Token::Comma])?;
+							self.scan_next()?;
+						}
+					}
+					self.scan_next()?;
+
+					Ok(ASTNode::FunctionCall { name: c, args: arg_list })
+				} else {
+					Ok(ASTNode::Literal(Literal::Identifier(Identifier::Symbol(c))))
+				}
+			}
 			_ => Err(Error::LiteralExpected { received: token })
 		}
 	}
@@ -259,11 +284,13 @@ impl Parser {
 			None => { return Err(Error::BinaryOperatorExpected { received: Token::None }); }
 		}
 
+		let expr_finishers = [Token::Semicolon, Token::LeftCurly, Token::RightCurly, Token::RightParen, Token::Comma];
+
 		if let Token::EndOfFile = token {
-			return Err(Error::InvalidToken { expected: [Token::Semicolon, Token::LeftCurly, Token::RightCurly].to_vec(), received: Token::EndOfFile });
+			return Err(Error::InvalidToken { expected: expr_finishers.to_vec(), received: Token::EndOfFile });
 		} 
 		
-		if self.match_token(&[Token::Semicolon, Token::LeftCurly, Token::RightCurly]).is_ok() {
+		if self.match_token(&expr_finishers).is_ok() {
 			return Ok(left);
 		}
 
@@ -282,7 +309,7 @@ impl Parser {
 				return Ok(left);
 			}
 			
-			if self.match_token(&[Token::Semicolon, Token::LeftCurly, Token::RightCurly]).is_ok() {
+			if self.match_token(&expr_finishers).is_ok() {
 				return Ok(left);
 			}
 

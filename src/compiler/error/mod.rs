@@ -2,7 +2,7 @@ use std::{fmt, result};
 
 use crate::parsing::ast::Type;
 use crate::scanning::token::{Identifier, Token};
-use crate::generating::llvm::{LLVMValue, RegisterFormat};
+use crate::generating::llvm::{FunctionSignature, LLVMValue, RegisterFormat};
 
 pub type Result<T> = result::Result<T, Error>;
 
@@ -29,6 +29,7 @@ pub enum Error {
 	InvalidComparisonOperands { left: RegisterFormat, right: RegisterFormat },
 	InvalidAssignment { received: RegisterFormat, expected: RegisterFormat },
 	TypeUnknown { received: Type },
+	ArgumentMismatch { expected: FunctionSignature, received: Vec<LLVMValue> },
 }
 
 impl fmt::Display for Error {
@@ -94,6 +95,18 @@ impl fmt::Display for Error {
 			Error::InvalidComparisonOperands { left, right } => write!(f, "InvalidComparisonOperands: Attempted to compare {left} and {right}"),
 			Error::InvalidAssignment { received, expected } => write!(f, "InvalidAssigment: Attempted to assign {received} to {expected}"),
 			Error::TypeUnknown { received } => write!(f, "TypeUnknown: '{received}'"),
+			Error::ArgumentMismatch { expected, received } => {
+				write!(f, "ArgumentMismatch: Expected {expected}, but received (")?;
+
+				for (i, rec) in received.iter().enumerate() {
+					write!(f, "{fmt}", fmt=rec.format())?;
+					if i < received.len() - 1 {
+						write!(f, ",")?;
+					}
+				}
+
+				write!(f, ")")
+			}
 		}
 	}
 }

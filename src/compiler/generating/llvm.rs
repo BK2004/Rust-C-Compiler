@@ -136,6 +136,29 @@ impl FunctionSignature {
 			return_fmt: Box::new(return_fmt),
 		}
 	}
+
+	pub fn params(&self) -> &Vec<RegisterFormat> {
+		&self.params
+	}
+
+	pub fn return_fmt(&self) -> &RegisterFormat {
+		&self.return_fmt
+	}
+}
+
+impl fmt::Display for FunctionSignature {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		let mut out = String::from("function(");
+		for (i, param) in self.params.iter().enumerate() {
+			if i < self.params.len() - 1 {
+				out = format!("{out}{param}, ");
+			} else {
+				out = format!("{out}{param}");
+			}
+		}
+
+		write!(f, "{out}")
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -162,6 +185,14 @@ impl RegisterFormat {
 	pub fn can_compare_to(&self, other: &RegisterFormat, op: &Token) -> bool {
 		match (self, op, other) {
 			(RegisterFormat::Integer, _, RegisterFormat::Integer) => true,
+			_ => false,
+		}
+	}
+
+	pub fn can_convert_to(&self, other: &RegisterFormat) -> bool {
+		match (self, other) {
+			(RegisterFormat::Integer, RegisterFormat::Integer) => true,
+			(RegisterFormat::Boolean, RegisterFormat::Boolean) => true,
 			_ => false,
 		}
 	}

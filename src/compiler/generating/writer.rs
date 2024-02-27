@@ -4,7 +4,7 @@ use std::io::Write;
 use crate::error::*;
 use crate::generating::llvm::LLVMValue;
 
-use super::{Constant, Label, RegisterFormat, VirtualRegister};
+use super::{Constant, FunctionSignature, Label, RegisterFormat, VirtualRegister};
 
 #[derive(Debug)]
 pub struct Writer {
@@ -178,6 +178,20 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 	pub fn write_function_close(&mut self) -> Result<()> {
 		self.writeln("}")?;
 		self.writeln("")
+	}
+
+	// Write function call and put res in trg;
+	pub fn write_function_call(&mut self, name: &String, arg_vals: &Vec<LLVMValue>, ret_reg: &LLVMValue) -> Result<()> {
+		self.write(&format!("\t{ret_reg} = call {ret_type} @{name}(", ret_type=ret_reg.val_type()))?;
+
+		for (i, arg) in arg_vals.iter().enumerate() {
+			self.write(&format!("{arg_type} {arg}", arg_type=arg.val_type()))?;
+			if i < arg_vals.len() - 1 {
+				self.write(",")?;
+			}
+		}
+
+		self.writeln(")")
 	}
 
 	// Write a ret statement

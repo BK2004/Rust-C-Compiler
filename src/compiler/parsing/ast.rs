@@ -48,6 +48,10 @@ pub enum ASTNode {
 		body_block: Vec<ASTNode>,
 		return_type: Type,
 	},
+	FunctionCall {
+		name: String,
+		args: Vec<ASTNode>,
+	},
 	Return {
 		return_val: Box<ASTNode>,
 	}

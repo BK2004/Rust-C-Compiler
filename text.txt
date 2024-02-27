@@ -12,13 +12,30 @@ fn help (x, z) {
 fn mult(x, y) {
 	let mult_res = x * y;
 
-	print mult_res;
-
 	return mult_res;
 }
 
+fn fib(n) {
+	if n == 1 {
+		return 1;
+	}
+	if n == 0 {
+		return 0;
+	}
+
+	return fib(n-1) + fib(n-2);
+}
+
 fn main() {
-	print 13;
+	let i = 1;
+	let x = 1;
+	while i <= 10 {
+		print fib(i);
+
+		i = i + 1;
+		x = mult(x, i);
+		print x;
+	}
 
 	return 0;
 }

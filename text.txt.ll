@@ -38,13 +38,61 @@ define dso_local i64 @mult(i64 %arg.0,i64 %arg.1) #0 {
 	%mult_res = alloca i64
 	store i64 %3, i64* %mult_res
 	%4 = load i64, i64* %mult_res
-	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %4)
-	%6 = load i64, i64* %mult_res
-	ret i64 %6
+	ret i64 %4
+}
+
+define dso_local i64 @fib(i64 %arg.0) #0 {
+	%n = alloca i64
+	store i64 %arg.0, i64* %n
+	%1 = load i64, i64* %n
+	%2 = icmp eq i64 %1, 1
+	br i1 %2, label %label.3, label %label.4
+label.3:
+	ret i64 1
+	br label %label.4
+label.4:
+	%4 = load i64, i64* %n
+	%5 = icmp eq i64 %4, 0
+	br i1 %5, label %label.5, label %label.6
+label.5:
+	ret i64 0
+	br label %label.6
+label.6:
+	%7 = load i64, i64* %n
+	%8 = sub nsw i64 %7, 1
+	%9 = call i64 @fib(i64 %8)
+	%10 = load i64, i64* %n
+	%11 = sub nsw i64 %10, 2
+	%12 = call i64 @fib(i64 %11)
+	%13 = add nsw i64 %9, %12
+	ret i64 %13
 }
 
 define dso_local i64 @main() #0 {
-	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 13)
+	%i = alloca i64
+	store i64 1, i64* %i
+	%x = alloca i64
+	store i64 1, i64* %x
+	br label %label.7
+label.7:
+	%1 = load i64, i64* %i
+	%2 = icmp sle i64 %1, 10
+	br i1 %2, label %label.8, label %label.9
+label.8:
+	%3 = load i64, i64* %i
+	%4 = call i64 @fib(i64 %3)
+	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %4)
+	%6 = load i64, i64* %i
+	%7 = add nsw i64 %6, 1
+	store i64 %7, i64* %i
+	%8 = load i64, i64* %x
+	%9 = load i64, i64* %i
+	%10 = call i64 @mult(i64 %8,i64 %9)
+	store i64 %10, i64* %x
+	%11 = load i64, i64* %x
+	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %11)
+	br label %label.7
+label.9:
 	ret i64 0
 }
 
