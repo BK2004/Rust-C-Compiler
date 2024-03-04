@@ -1,4 +1,4 @@
-fn help (x: int, z: int) {
+fn help (x: int, z: int) -> int {
 	print 3;
 
 	if x < z {
@@ -9,13 +9,13 @@ fn help (x: int, z: int) {
 	return 0;
 }
 
-fn mult(x: int, y: int) {
+fn mult(x: int, y: int) -> int {
 	let mult_res = x * y;
 
 	return mult_res;
 }
 
-fn fib(n: int) {
+fn fib(n: int) -> int {
 	if n == 1 {
 		return 1;
 	}
@@ -26,18 +26,17 @@ fn fib(n: int) {
 	return fib(n-1) + fib(n-2);
 }
 
-fn main() {
-	let cond: bool;
-	let i: int = 1;
-	let x = 1;
-	cond = i <= 10;
-	while cond {
-		print fib(i);
+// weird even check because im too lazy to implement modulus
+fn is_even(n: int) -> bool {
+	return n / 2 * 2 == n;
+}
 
+fn main() -> int {
+	let i = 1;
+	while i < 200 {
+		print i;
+		print is_even(i);
 		i = i + 1;
-		x = mult(x, i);
-		print x;
-		cond = i <= 10;
 	}
 
 	return 0;

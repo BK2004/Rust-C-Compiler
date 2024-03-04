@@ -133,9 +133,19 @@ impl Parser {
 		self.match_token(&[Token::RightParen])?;
 		self.scan_next()?;
 
+		// Return type should be specified
+		self.match_token(&[Token::Arrow])?;
+		self.scan_next()?;
+		let type_id = self.match_identifier()?;
+		self.scan_next()?;
+		let return_type = match type_id {
+			Identifier::Symbol(t) => Type::Named { type_name: t },
+			_ => Err(Error::TypeExpected { received: type_id })?,
+		};
+
 		let body_block: Vec<ASTNode> = self.parse_block_statement()?;
 
-		Ok(Some(ASTNode::FunctionDefinition { name, parameters: param_list, body_block, return_type: Type::Named { type_name: "int".to_string() } }))
+		Ok(Some(ASTNode::FunctionDefinition { name, parameters: param_list, body_block, return_type }))
 	}
 
 	// Parse a statement, which for now contains an identifier followed by a binary expression followed by a semicolon

@@ -23,6 +23,7 @@ pub enum Token {
 	LessThanEqual,
 	GreaterThan,
 	GreaterThanEqual,
+	Arrow,
 }
 
 impl Token {
@@ -70,6 +71,7 @@ impl fmt::Display for Token {
 			Token::LessThanEqual => write!(f, "<="),
 			Token::GreaterThan => write!(f, ">"),
 			Token::GreaterThanEqual => write!(f, ">="),
+			Token::Arrow => write!(f, "->"),
 		}
 	}
 }
@@ -136,4 +138,5 @@ pub const TOKEN_SYMBOLS: &[(&str, Token)] = &[
 	("<=", Token::LessThanEqual),
 	(">", Token::GreaterThan),
 	(">=", Token::GreaterThanEqual),
+	("->", Token::Arrow),
 ];
