@@ -107,6 +107,17 @@ impl Parser {
 			let id = self.match_identifier()?;
 			self.scan_next()?;
 
+			// Param type is required
+			self.match_token(&[Token::Colon])?;
+			self.scan_next()?;
+			let type_id = self.match_identifier()?;
+			self.scan_next()?;
+
+			let param_type = match type_id {
+				Identifier::Symbol(t) => Type::Named { type_name: t},
+				_ => Err(Error::TypeExpected { received: type_id })?,
+			};
+
 			if !self.match_token(&[Token::RightParen]).is_ok() {
 				self.match_token(&[Token::Comma])?;
 				self.scan_next()?;
@@ -114,7 +125,7 @@ impl Parser {
 
 			// Add id to parameter list (guaranteed to run)
 			if let Identifier::Symbol(s) = id {
-				param_list.push(FunctionParameter { name: s, param_type: Type::Named { type_name: "int".to_string() }});
+				param_list.push(FunctionParameter { name: s, param_type });
 			}
 		}
 

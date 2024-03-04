@@ -1,4 +1,4 @@
-fn help (x, z) {
+fn help (x: int, z: int) {
 	print 3;
 
 	if x < z {
@@ -9,13 +9,13 @@ fn help (x, z) {
 	return 0;
 }
 
-fn mult(x, y) {
+fn mult(x: int, y: int) {
 	let mult_res = x * y;
 
 	return mult_res;
 }
 
-fn fib(n) {
+fn fib(n: int) {
 	if n == 1 {
 		return 1;
 	}

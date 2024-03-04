@@ -72,4 +72,47 @@ define dso_local i64 @main() #0 {
 	%cond = alloca i1
 	%i = alloca i64
 	store i64 1, i64* %i
-	%1 = icmp slt i64 2, 3
+	%x = alloca i64
+	store i64 1, i64* %x
+	%1 = load i64, i64* %i
+	%2 = icmp sle i64 %1, 10
+	store i1 %2, i1* %cond
+	br label %label.7
+label.7:
+	%3 = load i1, i1* %cond
+	br i1 %3, label %label.8, label %label.9
+label.8:
+	%4 = load i64, i64* %i
+	%5 = call i64 @fib(i64 %4)
+	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %5)
+	%7 = load i64, i64* %i
+	%8 = add nsw i64 %7, 1
+	store i64 %8, i64* %i
+	%9 = load i64, i64* %x
+	%10 = load i64, i64* %i
+	%11 = call i64 @mult(i64 %9,i64 %10)
+	store i64 %11, i64* %x
+	%12 = load i64, i64* %x
+	call i32(i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring, i32 0, i32 0), i64 %12)
+	%14 = load i64, i64* %i
+	%15 = icmp sle i64 %14, 10
+	store i1 %15, i1* %cond
+	br label %label.7
+label.9:
+	ret i64 0
+}
+
+declare i32 @printf(i8*, ...) #1
+
+attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
+attributes #1 = { "frame-pointer"="all" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
+
+!llvm.module.flags = !{!0, !1, !2, !3, !4}
+!llvm.ident = !{!5}
+
+!0 = !{i32 1, !"wchar_size", i32 4}
+!1 = !{i32 7, !"PIC Level", i32 2}
+!2 = !{i32 7, !"PIE Level", i32 2}
+!3 = !{i32 7, !"uwtable", i32 1}
+!4 = !{i32 7, !"frame-pointer", i32 2}
+!5 = !{!"ICD compiler"}

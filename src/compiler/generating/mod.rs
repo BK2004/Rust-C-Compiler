@@ -242,7 +242,8 @@ impl Generator {
 
 	// Generate if statement
 	pub fn generate_if(&mut self, expr: &ASTNode, block: &Vec<ASTNode>, else_block: &Option<Vec<ASTNode>>) -> Result<LLVMValue> {
-		let expr_llvm = self.ast_to_llvm(expr)?;
+		let mut expr_llvm = self.ast_to_llvm(expr)?;
+		self.ensure_literal(&mut expr_llvm)?;
 		expr_llvm.format().expect(RegisterFormat::Boolean)?;
 
 		// Generate a label for if branch.
@@ -299,7 +300,8 @@ impl Generator {
 
 		self.writer.write_branch(&cond_label)?;
 		self.writer.write_label(&cond_label)?;
-		let expr_llvm = self.ast_to_llvm(expr)?;
+		let mut expr_llvm = self.ast_to_llvm(expr)?;
+		self.ensure_literal(&mut expr_llvm)?;
 		expr_llvm.format().expect(RegisterFormat::Boolean)?;
 		self.writer.write_cond_branch(&expr_llvm, &body_label, &tail_label)?;
 
