@@ -214,14 +214,26 @@ impl Generator {
 
 		if let Some(val) = value {
 			let assigned_llvm = self.ast_to_llvm(&val)?;
-			let (symbol, reg) = self.local_symbol_table.create_local(name, &assigned_llvm.format());
-			self.writer.write_local_alloc(&reg, &assigned_llvm.format())?;
+			// If val_type is not given, use implicit format
+			let reg_fmt = match val_type {
+				Some(v) => self.get_format_from_type(v)?,
+				None => assigned_llvm.format(),
+			};
+			if !assigned_llvm.format().can_convert_to(&reg_fmt) {
+				Err(Error::InvalidAssignment { received: assigned_llvm.format().to_owned(), expected: reg_fmt.clone() })?;
+			}
+			let (symbol, reg) = self.local_symbol_table.create_local(name, &reg_fmt);
+			self.writer.write_local_alloc(&reg, &reg_fmt)?;
 			self.writer.write_store(&assigned_llvm, &LLVMValue::VirtualRegister(reg))?;
 			self.local_symbol_table.insert(symbol);
 		} else {
-			// No value assigned; allocate an int
-			let (symbol, reg) = self.local_symbol_table.create_local(name, &RegisterFormat::Integer);
-			self.writer.write_local_alloc(&reg, &RegisterFormat::Integer)?;
+			// No value assigned; if value type specified, assign that type; else, assign an int
+			let reg_fmt = match val_type {
+				Some(v) => self.get_format_from_type(v)?,
+				None => RegisterFormat::Integer
+			};
+			let (symbol, reg) = self.local_symbol_table.create_local(name, &reg_fmt);
+			self.writer.write_local_alloc(&reg, &reg_fmt)?;
 			self.local_symbol_table.insert(symbol);
 		}
 

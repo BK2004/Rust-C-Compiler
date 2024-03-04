@@ -29,6 +29,7 @@ pub enum Error {
 	InvalidComparisonOperands { left: RegisterFormat, right: RegisterFormat },
 	InvalidAssignment { received: RegisterFormat, expected: RegisterFormat },
 	TypeUnknown { received: Type },
+	TypeExpected { received: Identifier },
 	ArgumentMismatch { expected: FunctionSignature, received: Vec<LLVMValue> },
 }
 
@@ -95,6 +96,7 @@ impl fmt::Display for Error {
 			Error::InvalidComparisonOperands { left, right } => write!(f, "InvalidComparisonOperands: Attempted to compare {left} and {right}"),
 			Error::InvalidAssignment { received, expected } => write!(f, "InvalidAssigment: Attempted to assign {received} to {expected}"),
 			Error::TypeUnknown { received } => write!(f, "TypeUnknown: '{received}'"),
+			Error::TypeExpected { received } => write!(f, "TypeExpected: Expected a type, but got {received}"),
 			Error::ArgumentMismatch { expected, received } => {
 				write!(f, "ArgumentMismatch: Expected {expected}, but received (")?;
 

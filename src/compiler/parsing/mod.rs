@@ -38,7 +38,6 @@ impl Parser {
 	// Scan next token into parser
 	pub fn scan_next(&mut self) -> Result<()> {
 		let token = self.scanner.scan()?;
-		dbg!(&token);
 
 		self.current_token = token;
 		Ok(())
@@ -158,11 +157,11 @@ impl Parser {
 
 				match id {
 					Identifier::Symbol(symbol) => {
-						let eq_or_semi = self.match_token(&[Token::Equals, Token::Semicolon])?;
+						let after_id = self.match_token(&[Token::Equals, Token::Semicolon, Token::Colon])?;
 						self.scan_next()?;
 
 						// If eq_or_semi is Equals, assigment should occur in the same line; else, statement ends on semicolon
-						match eq_or_semi {
+						match after_id {
 							Token::Equals => {
 								let val = Some(Box::new(self.parse_binary_operation(0)?));
 								self.match_token(&[Token::Semicolon])?;
@@ -173,6 +172,33 @@ impl Parser {
 									value: val
 								})
 							},
+							Token::Colon => {
+								let type_id = self.match_identifier()?;
+								self.scan_next()?;
+								let val_type = Some(match type_id {
+									Identifier::Symbol(t) => Type::Named { type_name: t },
+									_ => Err(Error::TypeExpected { received: type_id })?,
+								});
+								let semi_or_eq = self.match_token(&[Token::Semicolon, Token::Equals])?;
+								self.scan_next()?;
+
+								match semi_or_eq {
+									Token::Equals => {
+										let val = Some(Box::new(self.parse_binary_operation(0)?));
+										self.match_token(&[Token::Semicolon])?;
+										self.scan_next()?;
+
+										Ok(ASTNode::Let {
+											name: symbol,
+											val_type,
+											value: val,
+										})
+									},
+									_ => {
+										Ok(ASTNode::Let { name: symbol, val_type, value: None })
+									}
+								}
+							}
 							_ => Ok(ASTNode::Let { name: symbol, val_type: None, value: None })
 						}
 					},

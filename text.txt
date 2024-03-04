@@ -27,14 +27,17 @@ fn fib(n) {
 }
 
 fn main() {
-	let i = 1;
+	let cond: bool;
+	let i: int = 1;
 	let x = 1;
-	while i <= 10 {
+	cond = i <= 10;
+	while cond {
 		print fib(i);
 
 		i = i + 1;
 		x = mult(x, i);
 		print x;
+		cond = i <= 10;
 	}
 
 	return 0;
