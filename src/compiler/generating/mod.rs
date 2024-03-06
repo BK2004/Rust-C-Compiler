@@ -65,7 +65,7 @@ impl Generator {
 		while let Some(function) = parser.parse_global_statement()? {
 			self.free_register_count = self.next_register - 1;
 
-			self.ast_to_llvm(&function)?;
+			self.ast_to_llvm(&function, None)?;
 		}
 
 		self.writer.write_postamble()?;
@@ -95,15 +95,15 @@ impl Generator {
 	}
 
 	// Traverse AST and generate LLVM for the tree
-	pub fn ast_to_llvm(&mut self, root: &ASTNode) -> Result<LLVMValue> {
+	pub fn ast_to_llvm(&mut self, root: &ASTNode, expected_fmt: Option<RegisterFormat>) -> Result<LLVMValue> {
 		match root {
 			ASTNode::Literal(x) => Ok(self.generate_literal(x)?),
 			ASTNode::Binary {token, left, right} => Ok(self.generate_binary(token, *(*left).clone(), *(*right).clone())?),
 			ASTNode::Let { name, val_type, value } => Ok(self.generate_let(name, val_type, value)?),
-			ASTNode::If { expr, block, else_block } => Ok(self.generate_if(expr, block, else_block)?),
-			ASTNode::While { expr, block } => Ok(self.generate_while(expr, block)?),
+			ASTNode::If { expr, block, else_block } => Ok(self.generate_if(expr, block, else_block, &expected_fmt)?),
+			ASTNode::While { expr, block } => Ok(self.generate_while(expr, block, &expected_fmt)?),
 			ASTNode::FunctionDefinition { name, parameters, body_block, return_type } => Ok(self.generate_function(name.to_owned(), parameters, body_block, return_type)?),
-			ASTNode::Return { return_val } => Ok(self.generate_return(return_val)?),
+			ASTNode::Return { return_val } => Ok(self.generate_return(return_val, &expected_fmt)?),
 			ASTNode::FunctionCall { name, args } => Ok(self.generate_function_call(name, args)?),
 			ASTNode::Print { expr } => Ok(self.generate_print(expr)?),
 		}
@@ -123,8 +123,8 @@ impl Generator {
 
 	// Generate binary statement given operation and left/right LLVMValues
 	pub fn generate_binary(&mut self, token: &Token, left: ASTNode, right: ASTNode) -> Result<LLVMValue> {
-		let left = self.ast_to_llvm(&left)?;
-		let right = self.ast_to_llvm(&right)?;
+		let left = self.ast_to_llvm(&left, None)?;
+		let right = self.ast_to_llvm(&right, None)?;
 
 		let out = match token {
 			Token::Asterisk => Ok(self.generate_mul(left, right)?),
@@ -213,7 +213,7 @@ impl Generator {
 		}
 
 		if let Some(val) = value {
-			let assigned_llvm = self.ast_to_llvm(&val)?;
+			let assigned_llvm = self.ast_to_llvm(&val, None)?;
 			// If val_type is not given, use implicit format
 			let reg_fmt = match val_type {
 				Some(v) => self.get_format_from_type(v)?,
@@ -241,8 +241,8 @@ impl Generator {
 	}
 
 	// Generate if statement
-	pub fn generate_if(&mut self, expr: &ASTNode, block: &Vec<ASTNode>, else_block: &Option<Vec<ASTNode>>) -> Result<LLVMValue> {
-		let mut expr_llvm = self.ast_to_llvm(expr)?;
+	pub fn generate_if(&mut self, expr: &ASTNode, block: &Vec<ASTNode>, else_block: &Option<Vec<ASTNode>>, expected_fmt: &Option<RegisterFormat>) -> Result<LLVMValue> {
+		let mut expr_llvm = self.ast_to_llvm(expr, None)?;
 		self.ensure_literal(&mut expr_llvm)?;
 		expr_llvm.format().expect(RegisterFormat::Boolean)?;
 
@@ -260,7 +260,7 @@ impl Generator {
 			self.writer.write_label(&body_label)?;
 
 			for block_statement in block {
-				self.ast_to_llvm(block_statement)?;
+				self.ast_to_llvm(block_statement, expected_fmt.to_owned())?;
 			}
 
 			self.writer.write_branch(&tail_label)?;
@@ -268,7 +268,7 @@ impl Generator {
 			// Write else portion
 			self.writer.write_label(&else_label)?;
 			for else_statement in else_block {
-				self.ast_to_llvm(else_statement)?;
+				self.ast_to_llvm(else_statement, expected_fmt.to_owned())?;
 			}
 
 			self.writer.write_branch(&tail_label)?;
@@ -283,7 +283,7 @@ impl Generator {
 			self.writer.write_label(&body_label)?;
 
 			for block_statement in block {
-				self.ast_to_llvm(block_statement)?;
+				self.ast_to_llvm(block_statement, None)?;
 			}
 
 			self.writer.write_branch(&tail_label)?;
@@ -293,14 +293,14 @@ impl Generator {
 		Ok(LLVMValue::None)
 	}
 
-	pub fn generate_while(&mut self, expr: &ASTNode, block: &Vec<ASTNode>) -> Result<LLVMValue> {
+	pub fn generate_while(&mut self, expr: &ASTNode, block: &Vec<ASTNode>, expected_fmt: &Option<RegisterFormat>) -> Result<LLVMValue> {
 		let cond_label = Label::new(self.update_label_count(1));
 		let body_label = Label::new(self.update_label_count(1));
 		let tail_label = Label::new(self.update_label_count(1));
 
 		self.writer.write_branch(&cond_label)?;
 		self.writer.write_label(&cond_label)?;
-		let mut expr_llvm = self.ast_to_llvm(expr)?;
+		let mut expr_llvm = self.ast_to_llvm(expr, None)?;
 		self.ensure_literal(&mut expr_llvm)?;
 		expr_llvm.format().expect(RegisterFormat::Boolean)?;
 		self.writer.write_cond_branch(&expr_llvm, &body_label, &tail_label)?;
@@ -308,7 +308,7 @@ impl Generator {
 		// Write body
 		self.writer.write_label(&body_label)?;
 		for body_statement in block {
-			self.ast_to_llvm(body_statement)?;
+			self.ast_to_llvm(body_statement, expected_fmt.to_owned())?;
 		}
 		self.writer.write_branch(&cond_label)?;
 
@@ -345,7 +345,7 @@ impl Generator {
 		self.global_symbol_table.insert(func_symbol);
 
 		for block_statement in body_block {
-			self.ast_to_llvm(block_statement)?;
+			self.ast_to_llvm(block_statement, Some(return_fmt.clone()))?;
 		}
 
 		self.writer.write_function_close()?;
@@ -357,9 +357,15 @@ impl Generator {
 	}
 
 	// Generate a return statement
-	pub fn generate_return(&mut self, expr: &ASTNode) -> Result<LLVMValue> {
-		let mut val = self.ast_to_llvm(expr)?;
+	pub fn generate_return(&mut self, expr: &Option<Box<ASTNode>>, expected_fmt: &Option<RegisterFormat>) -> Result<LLVMValue> {
+		let mut val = match expr {
+			Some(expr) => self.ast_to_llvm(expr, None)?,
+			None => LLVMValue::VirtualRegister(VirtualRegister::new(self.update_virtual_register(0).to_string(), RegisterFormat::Void, true)),
+		};
 		self.ensure_literal(&mut val)?;
+		if let Some(fmt) = expected_fmt {
+			fmt.expect(val.format())?;
+		}
 
 		if let LLVMValue::None = val {
 			return Err(Error::ExpressionExpected)
@@ -376,7 +382,7 @@ impl Generator {
 		// Parse arguments
 		let mut arg_vals: Vec<LLVMValue> = Vec::new();
 		for node in args {
-			arg_vals.push(self.ast_to_llvm(node)?);
+			arg_vals.push(self.ast_to_llvm(node, None)?);
 		}
 
 		for (_, arg) in arg_vals.iter_mut().enumerate() {
@@ -395,8 +401,8 @@ impl Generator {
 					}
 				}
 
-				// Generate new numbered register for call result
-				let ret_reg_num = self.update_virtual_register(1);
+				// Generate new numbered register for call result if not a void call
+				let ret_reg_num = self.update_virtual_register(match signature.return_fmt() { RegisterFormat::Void => 0, _ => 1 });
 				let ret_reg = LLVMValue::VirtualRegister(VirtualRegister::new(ret_reg_num.to_string(), signature.return_fmt().to_owned(), true));
 
 				self.writer.write_function_call(&name, &arg_vals, &ret_reg)?;
@@ -413,7 +419,7 @@ impl Generator {
 
 	// Generate print statement
 	pub fn generate_print(&mut self, expr: &ASTNode) -> Result<LLVMValue> {
-		let mut val = self.ast_to_llvm(expr)?;
+		let mut val = self.ast_to_llvm(expr, None)?;
 		self.ensure_literal(&mut val)?;
 		
 		if let LLVMValue::None = val {
@@ -499,7 +505,8 @@ impl Generator {
 		let fmt = match source {
 			Type::Named { type_name } => {
 				TYPE_FORMATS.iter().find_map(|type_fmt| if type_name == type_fmt.0 { Some(type_fmt.1.clone()) } else { None }  )
-			}
+			},
+			Type::Void => Some(RegisterFormat::Void),
 		};
 
 		match fmt {

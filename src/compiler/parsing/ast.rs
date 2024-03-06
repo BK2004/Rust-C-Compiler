@@ -4,13 +4,15 @@ use crate::scanning::token::{Token, Literal};
 pub enum Type {
 	Named {
 		type_name: String
-	}
+	},
+	Void
 }
 
 impl std::fmt::Display for Type {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Type::Named { type_name } => write!(f, "{type_name}"),
+			Type::Void => write!(f, "void"),
 		}
 	}
 }
@@ -53,6 +55,6 @@ pub enum ASTNode {
 		args: Vec<ASTNode>,
 	},
 	Return {
-		return_val: Box<ASTNode>,
+		return_val: Option<Box<ASTNode>>,
 	}
 }

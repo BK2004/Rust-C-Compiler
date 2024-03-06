@@ -31,6 +31,7 @@ pub enum Error {
 	TypeUnknown { received: Type },
 	TypeExpected { received: Identifier },
 	ArgumentMismatch { expected: FunctionSignature, received: Vec<LLVMValue> },
+	UnexpectedFormat { expected: RegisterFormat, received: RegisterFormat },
 }
 
 impl fmt::Display for Error {
@@ -108,7 +109,8 @@ impl fmt::Display for Error {
 				}
 
 				write!(f, ")")
-			}
+			},
+			Error::UnexpectedFormat { received, expected} => write!(f, "UnexpectedFormat: Expected {expected}, but got {received}"),
 		}
 	}
 }

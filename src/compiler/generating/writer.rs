@@ -182,7 +182,11 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 
 	// Write function call and put res in trg;
 	pub fn write_function_call(&mut self, name: &String, arg_vals: &Vec<LLVMValue>, ret_reg: &LLVMValue) -> Result<()> {
-		self.write(&format!("\t{ret_reg} = call {ret_type} @{name}(", ret_type=ret_reg.val_type()))?;
+		self.write("\t")?;
+		if let RegisterFormat::Void = ret_reg.format() {} else {
+			self.write(&format!("{ret_reg} = "))?;
+		}
+		self.write(&format!("\tcall {ret_type} @{name}(", ret_type=ret_reg.val_type()))?;
 
 		for (i, arg) in arg_vals.iter().enumerate() {
 			self.write(&format!("{arg_type} {arg}", arg_type=arg.val_type()))?;
@@ -196,7 +200,11 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 
 	// Write a ret statement
 	pub fn write_ret(&mut self, val: &LLVMValue) -> Result<()> {
-		self.writeln(&format!("\tret {val_type} {val}", val_type=val.val_type()))
+		if let RegisterFormat::Void = val.format() {
+			self.writeln("\tret void")
+		} else {
+			self.writeln(&format!("\tret {val_type} {val}", val_type=val.val_type()))
+		}
 	}
 
 	// Print integer (i32)

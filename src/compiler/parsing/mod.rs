@@ -133,15 +133,19 @@ impl Parser {
 		self.match_token(&[Token::RightParen])?;
 		self.scan_next()?;
 
-		// Return type should be specified
-		self.match_token(&[Token::Arrow])?;
-		self.scan_next()?;
-		let type_id = self.match_identifier()?;
-		self.scan_next()?;
-		let return_type = match type_id {
-			Identifier::Symbol(t) => Type::Named { type_name: t },
-			_ => Err(Error::TypeExpected { received: type_id })?,
-		};
+		// Return type should be specified; if not, classify it as return void
+		let return_type: Type;
+		if self.match_token(&[Token::Arrow]).is_ok() {
+			self.scan_next()?;
+			let type_id = self.match_identifier()?;
+			self.scan_next()?;
+			return_type = match type_id {
+				Identifier::Symbol(t) => Type::Named { type_name: t },
+				_ => Err(Error::TypeExpected { received: type_id })?,
+			};
+		} else {
+			return_type = Type::Void;
+		}
 
 		let body_block: Vec<ASTNode> = self.parse_block_statement()?;
 
@@ -253,24 +257,56 @@ impl Parser {
 				Ok(ASTNode::While { expr, block })
 			},
 			Identifier::Return => {
-				let return_val = Box::new(self.parse_binary_operation(0)?);
-				self.scan_next()?;
+				if self.match_token(&[Token::Semicolon]).is_ok() {
+					self.scan_next()?;
+					Ok(ASTNode::Return { return_val: None})
+				} else {
+					let return_val = Some(Box::new(self.parse_binary_operation(0)?));
+					self.scan_next()?;
 
-				Ok(ASTNode::Return { return_val })
+					Ok(ASTNode::Return { return_val })
+				}
 			},
-			Identifier::Symbol(_) => {
+			Identifier::Symbol(name) => {
 				// Should match <symbol> = <value>;
-				let token = self.match_token(&[Token::Equals])?;
+				let token = self.match_token(&[Token::Equals, Token::LeftParen])?;
 				self.scan_next()?;
 
-				let val = Box::new(self.parse_binary_operation(0)?);
-				self.match_token(&[Token::Semicolon])?;
-				self.scan_next()?;
+				if let Token::LeftParen = token {
+					// Function call
+					let arg_list = self.parse_function_args()?;
+					self.match_token(&[Token::Semicolon])?;
+					self.scan_next()?;
 
-				Ok(ASTNode::Binary { token, left: Box::new(ASTNode::Literal(Literal::Identifier(identifier.clone()))), right: val })
+					Ok(ASTNode::FunctionCall { name: name.to_owned(), args: arg_list })
+				} else {
+					// Assignment
+					let val = Box::new(self.parse_binary_operation(0)?);
+					self.match_token(&[Token::Semicolon])?;
+					self.scan_next()?;
+
+					Ok(ASTNode::Binary { token, left: Box::new(ASTNode::Literal(Literal::Identifier(identifier.clone()))), right: val })
+				}
 			},
 			_ => Err(Error::InvalidIdentifier { received: identifier, expected: [Identifier::If, Identifier::Print, Identifier::Let, Identifier::Symbol("".to_string())].to_vec() }),
 		}?))
+	}
+
+	// Parse args given to a function call
+	pub fn parse_function_args(&mut self) -> Result<Vec<ASTNode>> {
+		let mut arg_list: Vec<ASTNode> = Vec::new();
+		while self.match_token(&[Token::RightParen]).is_err() {
+			let expr = self.parse_binary_operation(0)?;
+			arg_list.push(expr);
+
+			if self.match_token(&[Token::RightParen]).is_err() {
+				self.match_token(&[Token::Comma])?;
+				self.scan_next()?;
+			}
+		}
+		self.scan_next()?;
+
+		Ok(arg_list)
 	}
 
 	// Parse a terminal node, i.e. a node is created with a literal token
@@ -286,19 +322,8 @@ impl Parser {
 
 				// If a left parentheses follows, parse a function call
 				if self.match_token(&[Token::LeftParen]).is_ok() {
-					let mut arg_list: Vec<ASTNode> = Vec::new();
 					self.scan_next()?;
-
-					while self.match_token(&[Token::RightParen]).is_err() {
-						let expr = self.parse_binary_operation(0)?;
-						arg_list.push(expr);
-
-						if self.match_token(&[Token::RightParen]).is_err() {
-							self.match_token(&[Token::Comma])?;
-							self.scan_next()?;
-						}
-					}
-					self.scan_next()?;
+					let mut arg_list = self.parse_function_args()?;
 
 					Ok(ASTNode::FunctionCall { name: c, args: arg_list })
 				} else {

@@ -212,7 +212,7 @@ impl RegisterFormat {
 		if self.to_owned().to_string() == other.to_string() {
 			Ok(())
 		} else {
-			Err(Error::InvalidAssignment { received: other.to_owned(), expected: self.to_owned() })
+			Err(Error::UnexpectedFormat { received: other.to_owned(), expected: self.to_owned() })
 		}
 	}
 }
