@@ -27,6 +27,13 @@ pub enum Token {
 }
 
 impl Token {
+	pub fn is_rl_associativity(&self) -> bool {
+		match self {
+			Token::Equals => true,
+			_ => false,
+		}
+	}
+
 	pub fn is_comparison(&self) -> bool {
 		match self {
 			Token::Equals2 | Token::ExclamationEqual | Token::LessThan | Token::LessThanEqual | Token::GreaterThan | Token::GreaterThanEqual => true,

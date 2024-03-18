@@ -10,12 +10,13 @@ pub const OPERATOR_PRECEDENCE: &[(Token, u8)] = &[
 	(Token::Asterisk, 12),
 	(Token::Plus, 11),
 	(Token::Minus, 11),
-	(Token::GreaterThan, 11),
-	(Token::GreaterThanEqual, 11),
-	(Token::LessThan, 11),
-	(Token::LessThanEqual, 11),
-	(Token::Equals2, 10),
-	(Token::ExclamationEqual, 10),
+	(Token::GreaterThan, 9),
+	(Token::GreaterThanEqual, 9),
+	(Token::LessThan, 9),
+	(Token::LessThanEqual, 9),
+	(Token::Equals2, 8),
+	(Token::ExclamationEqual, 8),
+	(Token::Equals, 1),
 ];
 
 #[derive(Debug)]
@@ -161,10 +162,10 @@ impl Parser {
 
 		// Statement should follow the pattern "<identifier> <binary_expr> ;"
 		let identifier = self.match_identifier()?;
-		self.scan_next()?;
 
 		Ok(Some(match &identifier {
 			Identifier::Print => {
+				self.scan_next()?;
 				Ok(ASTNode::Print {
 					expr: {
 						let b = Box::new(self.parse_binary_operation(0)?);
@@ -176,6 +177,7 @@ impl Parser {
 				})
 			},
 			Identifier::Let => {
+				self.scan_next()?;
 				// Let should be formatted as either 'let <symbol> = <value>;' or 'let <symbol>;'
 				let id = self.match_identifier()?;
 				self.scan_next()?;
@@ -231,6 +233,7 @@ impl Parser {
 				}
 			},
 			Identifier::If => {
+				self.scan_next()?;
 				// Follows 'if <expr> <block>'
 				// Should get a boolean expression after if;
 				let expr = Box::new(self.parse_binary_operation(0)?);
@@ -247,6 +250,7 @@ impl Parser {
 				Ok(ASTNode::If { expr, block, else_block })
 			},
 			Identifier::While => {
+				self.scan_next()?;
 				// Follows 'while <expr> <block>'
 				// Expecting boolean expression after keyword
 				let expr = Box::new(self.parse_binary_operation(0)?);
@@ -257,6 +261,7 @@ impl Parser {
 				Ok(ASTNode::While { expr, block })
 			},
 			Identifier::Return => {
+				self.scan_next()?;
 				if self.match_token(&[Token::Semicolon]).is_ok() {
 					self.scan_next()?;
 					Ok(ASTNode::Return { return_val: None})
@@ -267,26 +272,12 @@ impl Parser {
 					Ok(ASTNode::Return { return_val })
 				}
 			},
-			Identifier::Symbol(name) => {
-				// Should match <symbol> = <value>;
-				let token = self.match_token(&[Token::Equals, Token::LeftParen])?;
+			Identifier::Symbol(_) => {
+				let result = self.parse_binary_operation(0)?;
+				dbg!(&result);
 				self.scan_next()?;
 
-				if let Token::LeftParen = token {
-					// Function call
-					let arg_list = self.parse_function_args()?;
-					self.match_token(&[Token::Semicolon])?;
-					self.scan_next()?;
-
-					Ok(ASTNode::FunctionCall { name: name.to_owned(), args: arg_list })
-				} else {
-					// Assignment
-					let val = Box::new(self.parse_binary_operation(0)?);
-					self.match_token(&[Token::Semicolon])?;
-					self.scan_next()?;
-
-					Ok(ASTNode::Binary { token, left: Box::new(ASTNode::Literal(Literal::Identifier(identifier.clone()))), right: val })
-				}
+				Ok(result)
 			},
 			_ => Err(Error::InvalidIdentifier { received: identifier, expected: [Identifier::If, Identifier::Print, Identifier::Let, Identifier::Symbol("".to_string())].to_vec() }),
 		}?))
@@ -323,14 +314,14 @@ impl Parser {
 				// If a left parentheses follows, parse a function call
 				if self.match_token(&[Token::LeftParen]).is_ok() {
 					self.scan_next()?;
-					let mut arg_list = self.parse_function_args()?;
+					let arg_list = self.parse_function_args()?;
 
 					Ok(ASTNode::FunctionCall { name: c, args: arg_list })
 				} else {
 					Ok(ASTNode::Literal(Literal::Identifier(Identifier::Symbol(c))))
 				}
 			}
-			_ => Err(Error::LiteralExpected { received: token })
+			_ => { Err(Error::LiteralExpected { received: token })}
 		}
 	}
 
@@ -366,7 +357,7 @@ impl Parser {
 			return Ok(left);
 		}
 
-		while self.get_precedence(&token)? > prev {
+		while (self.get_precedence(&token)? > prev) || (self.get_precedence(&token)? == prev && token.is_rl_associativity()) {
 			// Scan next token
 			self.scan_next()?;
 

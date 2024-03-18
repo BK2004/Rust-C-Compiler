@@ -11,6 +11,6 @@ $(IN).ll :
 clean :
 	rm -f $(OUT) *.ll
 
-run : $(OUT)
+run : clean $(OUT)
 	./$(OUT)
 	make -s clean

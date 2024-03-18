@@ -147,8 +147,8 @@ impl Generator {
 
 	// Generate LLVMValue for multiplication
 	pub fn generate_mul(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
-		self.ensure_literal(&mut left)?;
-		self.ensure_literal(&mut right)?;
+		self.ensure_rvalue(&mut left)?;
+		self.ensure_rvalue(&mut right)?;
 		self.ensure_arithmetic_operands(&mut left, &mut right)?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_mul(&left, &right, reg)?;
@@ -158,8 +158,8 @@ impl Generator {
 
 	// Generate LLVMValue for subtraction
 	pub fn generate_sub(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
-		self.ensure_literal(&mut left)?;
-		self.ensure_literal(&mut right)?;
+		self.ensure_rvalue(&mut left)?;
+		self.ensure_rvalue(&mut right)?;
 		self.ensure_arithmetic_operands(&mut left, &mut right)?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_sub(&left, &right, reg)?;
@@ -169,8 +169,8 @@ impl Generator {
 
 	// Generate LLVMValue for addition
 	pub fn generate_add(&mut self, mut left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
-		self.ensure_literal(&mut left)?;
-		self.ensure_literal(&mut right)?;
+		self.ensure_rvalue(&mut left)?;
+		self.ensure_rvalue(&mut right)?;
 		self.ensure_arithmetic_operands(&mut left, &mut right)?;
 		let reg = self.update_virtual_register(1);
 		self.writer.write_add(&left, &right, reg)?;
@@ -190,7 +190,7 @@ impl Generator {
 	// Generate LLVMValue for assignment of left = right
 	pub fn generate_assign(&mut self, left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
 		// Make right an operand, assign it to left, and return left for use again
-		self.ensure_literal(&mut right)?;
+		self.ensure_rvalue(&mut right)?;
 		left.format().expect(right.format())?;
 		self.writer.write_store(&right, &left)?;
 		Ok(left)
@@ -243,7 +243,7 @@ impl Generator {
 	// Generate if statement
 	pub fn generate_if(&mut self, expr: &ASTNode, block: &Vec<ASTNode>, else_block: &Option<Vec<ASTNode>>, expected_fmt: &Option<RegisterFormat>) -> Result<LLVMValue> {
 		let mut expr_llvm = self.ast_to_llvm(expr, None)?;
-		self.ensure_literal(&mut expr_llvm)?;
+		self.ensure_rvalue(&mut expr_llvm)?;
 		expr_llvm.format().expect(RegisterFormat::Boolean)?;
 
 		// Generate a label for if branch.
@@ -301,7 +301,7 @@ impl Generator {
 		self.writer.write_branch(&cond_label)?;
 		self.writer.write_label(&cond_label)?;
 		let mut expr_llvm = self.ast_to_llvm(expr, None)?;
-		self.ensure_literal(&mut expr_llvm)?;
+		self.ensure_rvalue(&mut expr_llvm)?;
 		expr_llvm.format().expect(RegisterFormat::Boolean)?;
 		self.writer.write_cond_branch(&expr_llvm, &body_label, &tail_label)?;
 
@@ -362,7 +362,7 @@ impl Generator {
 			Some(expr) => self.ast_to_llvm(expr, None)?,
 			None => LLVMValue::VirtualRegister(VirtualRegister::new(self.update_virtual_register(0).to_string(), RegisterFormat::Void, true)),
 		};
-		self.ensure_literal(&mut val)?;
+		self.ensure_rvalue(&mut val)?;
 		if let Some(fmt) = expected_fmt {
 			fmt.expect(val.format())?;
 		}
@@ -386,7 +386,7 @@ impl Generator {
 		}
 
 		for (_, arg) in arg_vals.iter_mut().enumerate() {
-			self.ensure_literal(arg)?;
+			self.ensure_rvalue(arg)?;
 		}
 
 		// Get function symbol and check that args match
@@ -420,7 +420,7 @@ impl Generator {
 	// Generate print statement
 	pub fn generate_print(&mut self, expr: &ASTNode) -> Result<LLVMValue> {
 		let mut val = self.ast_to_llvm(expr, None)?;
-		self.ensure_literal(&mut val)?;
+		self.ensure_rvalue(&mut val)?;
 		
 		if let LLVMValue::None = val {
 			return Err(Error::ExpressionExpected)
@@ -447,8 +447,8 @@ impl Generator {
 
 	// Verify that LLVMValues are able to be operated on by arithmetic
 	pub fn ensure_arithmetic_operands(&mut self, mut left: &mut LLVMValue, mut right: &mut LLVMValue) -> Result<()> {
-		self.ensure_literal(&mut left)?;
-		self.ensure_literal(&mut right)?;
+		self.ensure_rvalue(&mut left)?;
+		self.ensure_rvalue(&mut right)?;
 
 		if let RegisterFormat::Integer = left.format() {
 			if let RegisterFormat::Integer = right.format() {
@@ -463,8 +463,8 @@ impl Generator {
 
 	// Verify that left and right can be compared
 	pub fn ensure_comparison_operands(&mut self, mut left: &mut LLVMValue, mut right: &mut LLVMValue, op: &Token) -> Result<()> {
-		self.ensure_literal(&mut left)?;
-		self.ensure_literal(&mut right)?;
+		self.ensure_rvalue(&mut left)?;
+		self.ensure_rvalue(&mut right)?;
 
 		let left_fmt = left.format();
 		let right_fmt = right.format();
@@ -477,7 +477,7 @@ impl Generator {
 	}
 
 	// Ensure that given LLVM Values are in operatable form
-	pub fn ensure_literal(&mut self, node: &mut LLVMValue) -> Result<()> {
+	pub fn ensure_rvalue(&mut self, node: &mut LLVMValue) -> Result<()> {
 		match node {
 			LLVMValue::None => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::Constant(Constant::Integer(3)), received: node.clone() }),
 			LLVMValue::VirtualRegister(r) => {
