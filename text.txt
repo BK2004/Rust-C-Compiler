@@ -42,6 +42,10 @@ fn return_nothing(x: bool) {
 	return;
 }
 
+fn add(x: int, y: int) -> int {
+	return x + y;
+}
+
 fn main() -> int {
 	let i = 1;
 	while i < 10 {
@@ -53,6 +57,10 @@ fn main() -> int {
 	return_nothing(2 > 1);
 	print 333;
 	return_nothing(1 > 2);
+
+	print add(3, i);
+
+	print 3 * (return_nothing(2 == 3));
 
 	return 0;
 }

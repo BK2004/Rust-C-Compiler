@@ -274,7 +274,6 @@ impl Parser {
 			},
 			Identifier::Symbol(_) => {
 				let result = self.parse_binary_operation(0)?;
-				dbg!(&result);
 				self.scan_next()?;
 
 				Ok(result)
@@ -307,6 +306,12 @@ impl Parser {
 		};
 
 		match token {
+			Token::LeftParen => {
+				self.scan_next()?;
+				let res = self.parse_binary_operation(0)?;
+				self.scan_next()?; 
+				Ok(res)
+			},
 			Token::Literal(Literal::Integer(x)) => {self.scan_next()?; Ok(ASTNode::Literal(Literal::Integer(x)))},
 			Token::Literal(Literal::Identifier(Identifier::Symbol(c))) => {
 				self.scan_next()?;
