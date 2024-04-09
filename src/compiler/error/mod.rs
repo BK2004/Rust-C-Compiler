@@ -32,6 +32,9 @@ pub enum Error {
 	TypeExpected { received: Identifier },
 	ArgumentMismatch { expected: FunctionSignature, received: Vec<LLVMValue> },
 	UnexpectedFormat { expected: RegisterFormat, received: RegisterFormat },
+	BadConversion { from: RegisterFormat, to: RegisterFormat },
+	InvalidDereference { received: RegisterFormat },
+	ExpectedLValue
 }
 
 impl fmt::Display for Error {
@@ -78,7 +81,7 @@ impl fmt::Display for Error {
 			Error::IdentifierExpected { received } => write!(f, "IdentifierExpected: Expected an identifier, but got {received}"),
 			Error::LiteralExpected { received } => write!(f, "LiteralExpected: Expected a Literal, but received {received}"),
 			Error::UnexpectedEOF { expected } => write!(f, "UnexpectedEOF: Expected {expected}, but reached EOF"),
-			Error::UnexpectedLLVMValue { expected, received } => write!(f, "UnexpectedLLVMValue: Expected a {expected}, but received {received}"),
+			Error::UnexpectedLLVMValue { expected, received } => write!(f, "UnexpectedLLVMValue: Expected a {expected_fmt}, but received {received_fmt}", expected_fmt=expected.val_type(), received_fmt=received.val_type()),
 			Error::StringParseError { cause } => write!(f, "StringParseError: {cause}"),
 			Error::SymbolUndefined { name } => write!(f, "SymbolUndefined: '{name}'"),
 			Error::SymbolDeclared { name } => write!(f, "SymbolDeclared: Symbol {name} has already been declared"),
@@ -95,7 +98,7 @@ impl fmt::Display for Error {
 			},
 			Error::InvalidArithmeticOperand { received } => write!(f, "InvalidArithmeticOperand: Attempted to perform arithmetic on {received}"),
 			Error::InvalidComparisonOperands { left, right } => write!(f, "InvalidComparisonOperands: Attempted to compare {left} and {right}"),
-			Error::InvalidAssignment { received, expected } => write!(f, "InvalidAssigment: Attempted to assign {received} to {expected}"),
+			Error::InvalidAssignment { received, expected } => write!(f, "InvalidAssigment: Attempted to assign {} to {}", received.format_type(), expected.format_type()),
 			Error::TypeUnknown { received } => write!(f, "TypeUnknown: '{received}'"),
 			Error::TypeExpected { received } => write!(f, "TypeExpected: Expected a type, but got {received}"),
 			Error::ArgumentMismatch { expected, received } => {
@@ -111,6 +114,9 @@ impl fmt::Display for Error {
 				write!(f, ")")
 			},
 			Error::UnexpectedFormat { received, expected} => write!(f, "UnexpectedFormat: Expected {expected}, but got {received}"),
+			Error::BadConversion { from, to } => write!(f, "BadConversion: Attempt to convert {from} to {to}"),
+			Error::InvalidDereference { received } => write!(f, "InvalidDereference: Attempt to dereference {received}"),
+			Error::ExpectedLValue => write!(f, "ExpectedLValue: Expected an LValue"),
 		}
 	}
 }

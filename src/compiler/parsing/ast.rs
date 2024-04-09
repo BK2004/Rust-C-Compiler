@@ -5,6 +5,9 @@ pub enum Type {
 	Named {
 		type_name: String
 	},
+	Pointer {
+		pointee_type: Box<Type>,
+	},
 	Void
 }
 
@@ -12,6 +15,7 @@ impl std::fmt::Display for Type {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Type::Named { type_name } => write!(f, "{type_name}"),
+			Type::Pointer { pointee_type } => write!(f, "*{pointee_type}"),
 			Type::Void => write!(f, "void"),
 		}
 	}
@@ -56,5 +60,11 @@ pub enum ASTNode {
 	},
 	Return {
 		return_val: Option<Box<ASTNode>>,
+	},
+	Dereference {
+		child: Box<ASTNode>,
+	},
+	Reference {
+		child: Box<ASTNode>,
 	}
 }

@@ -106,6 +106,8 @@ impl Generator {
 			ASTNode::Return { return_val } => Ok(self.generate_return(return_val, &expected_fmt)?),
 			ASTNode::FunctionCall { name, args } => Ok(self.generate_function_call(name, args)?),
 			ASTNode::Print { expr } => Ok(self.generate_print(expr)?),
+			ASTNode::Dereference { child } => Ok(self.generate_deref(child)?),
+			ASTNode::Reference { child } => Ok(self.generate_ref(child)?),
 		}
 
 	}
@@ -115,7 +117,7 @@ impl Generator {
 		match literal {
 			Literal::Integer(x) => Ok(LLVMValue::Constant(Constant::Integer(*x))),
 			Literal::Identifier(i) => match i {
-				Identifier::Symbol(x) => Ok(LLVMValue::VirtualRegister(VirtualRegister::from_identifier(x.to_owned(), i.to_owned(), true, self.local_symbol_table())?)),
+				Identifier::Symbol(x) => Ok(self.local_symbol_table.get(x)?.value().to_owned()),
 				_ => Err(Error::TerminalTokenExpected { received_token: None, received_identifier: Some(i.clone()) })
 			},
 		}
@@ -191,8 +193,16 @@ impl Generator {
 	pub fn generate_assign(&mut self, left: LLVMValue, mut right: LLVMValue) -> Result<LLVMValue> {
 		// Make right an operand, assign it to left, and return left for use again
 		self.ensure_rvalue(&mut right)?;
-		left.format().expect(right.format())?;
-		self.writer.write_store(&right, &left)?;
+		let mut new_left = left.clone();
+		self.ensure_lvalue(&mut new_left)?;
+
+		// Special case: left format is pointer, so check if pointee matches right
+		if let RegisterFormat::Pointer { pointee } = left.format() {
+			pointee.expect(right.format())?;
+		} else {
+			left.format().expect(right.format())?;
+		}
+		self.writer.write_store(&right, &new_left)?;
 		Ok(left)
 	}
 
@@ -213,12 +223,14 @@ impl Generator {
 		}
 
 		if let Some(val) = value {
-			let assigned_llvm = self.ast_to_llvm(&val, None)?;
+			let mut assigned_llvm = self.ast_to_llvm(&val, None)?;
+			self.ensure_rvalue(&mut assigned_llvm)?;
 			// If val_type is not given, use implicit format
 			let reg_fmt = match val_type {
 				Some(v) => self.get_format_from_type(v)?,
 				None => assigned_llvm.format(),
 			};
+			
 			if !assigned_llvm.format().can_convert_to(&reg_fmt) {
 				Err(Error::InvalidAssignment { received: assigned_llvm.format().to_owned(), expected: reg_fmt.clone() })?;
 			}
@@ -244,7 +256,7 @@ impl Generator {
 	pub fn generate_if(&mut self, expr: &ASTNode, block: &Vec<ASTNode>, else_block: &Option<Vec<ASTNode>>, expected_fmt: &Option<RegisterFormat>) -> Result<LLVMValue> {
 		let mut expr_llvm = self.ast_to_llvm(expr, None)?;
 		self.ensure_rvalue(&mut expr_llvm)?;
-		expr_llvm.format().expect(RegisterFormat::Boolean)?;
+		self.coerce(&mut expr_llvm, RegisterFormat::Boolean)?;
 
 		// Generate a label for if branch.
 		// If else is present, generate an else label, emit conditional branch with body label and else label, and parse blocks
@@ -432,16 +444,43 @@ impl Generator {
 		Ok(LLVMValue::None)
 	}
 
-	pub fn load_numbered_register(&mut self, format: RegisterFormat, val: LLVMValue) -> Result<LLVMValue> {
-		if let LLVMValue::VirtualRegister(_) = &val {
-			let reg = self.update_virtual_register(1);
-			let reg_val = VirtualRegister::new(reg.to_string(), format, true);
+	// Generate instructions for dereferencing a node
+	pub fn generate_deref(&mut self, node: &ASTNode) -> Result<LLVMValue> {
+		// Get target to dereference
+		let mut trg = self.ast_to_llvm(node, None)?;
+		self.ensure_rvalue(&mut trg)?;
+		if let RegisterFormat::Pointer { pointee } = trg.format() {
+			let ret = LLVMValue::Indirect { pointee: Box::new(trg), referenced_fmt: (*pointee).clone() };
 
-			self.writer.write_load(&val.clone(), &reg_val)?;
-
-			Ok(LLVMValue::VirtualRegister(reg_val))
+			Ok(ret)
 		} else {
-			Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), RegisterFormat::Integer, true)), received: val })
+			Err(Error::InvalidDereference { received: trg.format() })
+		}
+	}
+
+	// Generate instructions for creating a reference to a node
+	pub fn generate_ref(&mut self, node: &ASTNode) -> Result<LLVMValue> {
+		// Get target to reference
+		let trg = self.ast_to_llvm(node, None)?;
+		dbg!(&trg);
+		if let LLVMValue::Indirect { pointee, .. } = trg {
+			Ok(*pointee)
+		} else {
+			Err(Error::ExpectedLValue)
+		}
+	}
+
+	pub fn load_numbered_register(&mut self, format: RegisterFormat, val: LLVMValue) -> Result<LLVMValue> {
+		match val {
+			LLVMValue::VirtualRegister(_) | LLVMValue::Indirect { .. } => {
+				let reg = self.update_virtual_register(1);
+				let reg_val = VirtualRegister::new(reg.to_string(), format, true);
+
+				self.writer.write_load(&val.clone(), &reg_val)?;
+
+				Ok(LLVMValue::VirtualRegister(reg_val))
+			},
+			_ => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::VirtualRegister(VirtualRegister::new("0".to_string(), format, true)), received: val })
 		}
 	}
 
@@ -476,24 +515,24 @@ impl Generator {
 		}
 	}
 
-	// Ensure that given LLVM Values are in operatable form
+	// Ensure LLVMValue is an L-value
+	pub fn ensure_lvalue(&mut self, node: &mut LLVMValue) -> Result<()> {
+		match node {
+			LLVMValue::Indirect { pointee, .. } => {
+				*node = (**pointee).clone();
+				Ok(())
+			},
+			_ => Err(Error::ExpectedLValue)
+		}
+	}
+
+	// Ensure that given LLVM Value is in operatable form
 	pub fn ensure_rvalue(&mut self, node: &mut LLVMValue) -> Result<()> {
 		match node {
 			LLVMValue::None => Err(Error::UnexpectedLLVMValue { expected: LLVMValue::Constant(Constant::Integer(3)), received: node.clone() }),
-			LLVMValue::VirtualRegister(r) => {
-				match r.format() {
-					RegisterFormat::Identifier { id_type } => {
-						*node = self.load_numbered_register(*id_type.to_owned(), node.clone())?;
-
-						Ok(())
-					}, 
-					RegisterFormat::Pointer { pointee } => {
-						*node = self.load_numbered_register(*pointee.clone(), node.clone())?;
-
-						Ok(())
-					},
-					_ => Ok(()),
-				}
+			LLVMValue::Indirect { pointee, referenced_fmt } => {
+				*node = self.load_numbered_register(referenced_fmt.to_owned(), (**pointee).clone())?;
+				Ok(())
 			},
 			_ => Ok(())
 		}?;
@@ -501,11 +540,37 @@ impl Generator {
 		Ok(())
 	}
 
+	// Coerce LLVMValue to given format
+	pub fn coerce(&mut self, value: &mut LLVMValue, new_fmt: RegisterFormat) -> Result<()> {
+		let val_fmt = value.format();
+		if !val_fmt.can_convert_to(&new_fmt) {
+			return Err(Error::BadConversion { from: val_fmt, to: new_fmt })
+		}
+
+		// Guaranteed to be one of these pairs
+		match (val_fmt, new_fmt) {
+			(RegisterFormat::Pointer { .. }, RegisterFormat::Boolean) => {
+				let reg = self.update_virtual_register(1);
+				let new_val = LLVMValue::VirtualRegister(VirtualRegister::new(reg.to_string(), RegisterFormat::Boolean, true));
+
+				self.writer.write_cmp(&value, &LLVMValue::Null, reg, "ne".to_string())?;
+				*value = new_val;
+
+				Ok(())
+			},
+			_ => {
+				// The formats must be equal
+				Ok(())
+			}
+		}
+	}
+
 	pub fn get_format_from_type(&mut self, source: &Type) -> Result<RegisterFormat> {
 		let fmt = match source {
 			Type::Named { type_name } => {
 				TYPE_FORMATS.iter().find_map(|type_fmt| if type_name == type_fmt.0 { Some(type_fmt.1.clone()) } else { None }  )
 			},
+			Type::Pointer { pointee_type } => Some(RegisterFormat::Pointer { pointee: Box::new(self.get_format_from_type(pointee_type)?)}),
 			Type::Void => Some(RegisterFormat::Void),
 		};
 

@@ -1,66 +1,13 @@
-fn help (x: int, z: int) -> int {
-	print 3;
-
-	if x < z {
-		return x;
-	} else {
-		return z;
-	}
-	return 0;
-}
-
-fn mult(x: int, y: int) -> int {
-	let mult_res = x * y;
-
-	return mult_res;
-}
-
-fn fib(n: int) -> int {
-	if n == 1 {
-		return 1;
-	}
-	if n == 0 {
-		return 0;
-	}
-
-	return fib(n-1) + fib(n-2);
-}
-
-// weird even check because im too lazy to implement modulus
-fn is_even(n: int) -> bool {
-	return n / 2 * 2 == n;
-}
-
-// testing void functionality (void is returned if no return type is given)
-fn return_nothing(x: bool) {
-	print x;
-
-	if x {
-		print x;
-	}
-
-	return;
-}
-
-fn add(x: int, y: int) -> int {
-	return x + y;
-}
-
 fn main() -> int {
-	let i = 1;
+	let i: int = 1;
 	while i < 10 {
 		print i;
-		print is_even(i);
 		i = i + 1;
 	}
-
-	return_nothing(2 > 1);
-	print 333;
-	return_nothing(1 > 2);
-
-	print add(3, i);
-
-	print 3 * (return_nothing(2 == 3));
+	let x: int* = &i;
+	*x = 7;
+	let y: int = *x;
+	print *x;
 
 	return 0;
 }

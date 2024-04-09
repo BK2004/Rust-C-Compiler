@@ -127,10 +127,9 @@ impl Scanner {
 			if c.is_alphabetic() {
 				let identifier = self.scan_identifier(c)?;
 
-				// Search for identifier in list of identifiers; if not found, error
-				for (_, id) in IDENTIFIER_SYMBOLS.iter().enumerate() {
+				for (_, id) in KEYWORD_TOKENS.iter().enumerate() {
 					if identifier.eq(id.0) {
-						return Ok(Some(Token::Literal(Literal::Identifier(id.1.clone()))));
+						return Ok(Some(id.1.clone()));
 					}
 				}
 

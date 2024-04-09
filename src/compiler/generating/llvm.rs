@@ -6,24 +6,30 @@ use super::{Identifier, Token};
 #[derive(Debug, Clone)]
 pub enum LLVMValue {
 	VirtualRegister(VirtualRegister),
+	Indirect { pointee: Box<LLVMValue>, referenced_fmt: RegisterFormat },
 	Constant(Constant),
-	None
+	None,
+	Null
 }
 
 impl LLVMValue {
 	pub fn val_type(&self) -> String {
 		match self {
 			LLVMValue::None => String::from("none"),
+			LLVMValue::Null => String::from("null"),
 			LLVMValue::Constant(c) => c.const_type(),
 			LLVMValue::VirtualRegister(v) => v.reg_type(),
+			LLVMValue::Indirect { pointee, referenced_fmt } => format!("{}", referenced_fmt.format_type()),
 		}
 	}
 
 	pub fn format(&self) -> RegisterFormat {
 		match self {
 			LLVMValue::None => RegisterFormat::Void,
+			LLVMValue::Null => RegisterFormat::Null,
 			LLVMValue::Constant(c) => c.format(),
 			LLVMValue::VirtualRegister(r) => r.format().clone(),
+			LLVMValue::Indirect { pointee, referenced_fmt } => pointee.format(),
 		}
 	}
 }
@@ -32,8 +38,10 @@ impl std::fmt::Display for LLVMValue {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
 		match self {
 			LLVMValue::None => write!(f, "None"),
+			LLVMValue::Null => write!(f, "null"),
 			LLVMValue::VirtualRegister(vr) => write!(f, "{vr}"),
 			LLVMValue::Constant(c) => write!(f, "{c}"),
+			LLVMValue::Indirect { pointee, referenced_fmt } => write!(f, "{pointee}"),
 		}
 	}
 }
@@ -164,6 +172,7 @@ impl fmt::Display for FunctionSignature {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegisterFormat {
 	Void,
+	Null,
 	Integer,
 	Boolean,
 	Identifier {
@@ -193,6 +202,8 @@ impl RegisterFormat {
 		match (self, other) {
 			(RegisterFormat::Integer, RegisterFormat::Integer) => true,
 			(RegisterFormat::Boolean, RegisterFormat::Boolean) => true,
+			(RegisterFormat::Pointer { .. }, RegisterFormat::Boolean) => true,
+			(RegisterFormat::Pointer { pointee: self_pointee }, RegisterFormat::Pointer { pointee: other_pointee }) => self_pointee.can_convert_to(&other_pointee),
 			_ => false,
 		}
 	}
@@ -205,6 +216,7 @@ impl RegisterFormat {
 			RegisterFormat::Boolean => String::from("i1"),
 			RegisterFormat::Pointer { pointee } => String::from(format!("{}*", pointee.format_type())),
 			RegisterFormat::Function { .. } => String::from("function"),
+			RegisterFormat::Null => String::from("null"),
 		}
 	}
 
@@ -223,9 +235,10 @@ impl fmt::Display for RegisterFormat {
 			RegisterFormat::Void => write!(f, "void"),
 			RegisterFormat::Boolean => write!(f, "bool"),
 			RegisterFormat::Integer => write!(f, "int"),
-			RegisterFormat::Pointer { pointee } => write!(f, "{pointee}"),
+			RegisterFormat::Pointer { pointee } => write!(f, "{pointee}*"),
 			RegisterFormat::Identifier { id_type } => write!(f, "{id_type}"),
 			RegisterFormat::Function { .. } => write!(f, "function"),
+			RegisterFormat::Null => write!(f, "null"),
 		}
 	}
 }
@@ -387,12 +400,15 @@ impl SymbolTable {
 	}
 
 	pub fn create_local(&self, name: &String, format: &RegisterFormat) -> (Symbol, VirtualRegister) {
-		let reg = VirtualRegister::new(name.to_owned(), format.clone(), true);
+		let pointer = VirtualRegister::new(name.to_owned(), format.to_pointer(), true);
+		let value = LLVMValue::Indirect {
+			pointee: Box::new(LLVMValue::VirtualRegister(pointer.clone())),
+			referenced_fmt: format.clone(),
+		};
 		let symbol = Symbol::Local {
 			name: name.to_owned(),
-			value: LLVMValue::VirtualRegister(reg.clone()),
+			value,
 		};
-		let pointer = VirtualRegister::new(name.to_owned(), format.to_pointer(), true);
 
 		(symbol, pointer)
 	}

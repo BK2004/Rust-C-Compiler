@@ -24,6 +24,14 @@ pub enum Token {
 	GreaterThan,
 	GreaterThanEqual,
 	Arrow,
+	Ampersand,
+	Let,
+	Print,
+	If,
+	Else,
+	While,
+	Function,
+	Return,
 }
 
 impl Token {
@@ -69,6 +77,7 @@ impl fmt::Display for Token {
 			Token::Asterisk => write!(f, "*"),
 			Token::Slash => write!(f, "/"),
 			Token::Semicolon => write!(f, ";"),
+			Token::Ampersand => write!(f, "&"),
 			Token::Colon => write!(f, ":"),
 			Token::Comma => write!(f, ","),
 			Token::Equals => write!(f, "="),
@@ -79,46 +88,29 @@ impl fmt::Display for Token {
 			Token::GreaterThan => write!(f, ">"),
 			Token::GreaterThanEqual => write!(f, ">="),
 			Token::Arrow => write!(f, "->"),
+			Token::Print => write!(f, "print"),
+			Token::Let => write!(f, "let"),
+			Token::If => write!(f, "if"),
+			Token::Else => write!(f, "else"),
+			Token::While => write!(f, "while"),
+			Token::Function => write!(f, "fn"),
+			Token::Return => write!(f, "return"),
 		}
 	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Identifier {
-	Let,
-	Print,
-	If,
-	Else,
-	While,
-	Function,
-	Return,
 	Symbol(String),
 }
 
 impl fmt::Display for Identifier {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
 		match self {
-			Identifier::Print => write!(f, "print"),
-			Identifier::Let => write!(f, "let"),
-			Identifier::If => write!(f, "if"),
-			Identifier::Else => write!(f, "else"),
-			Identifier::While => write!(f, "while"),
-			Identifier::Function => write!(f, "fn"),
-			Identifier::Return => write!(f, "return"),
 			Identifier::Symbol(s) => write!(f, "{s}"),
 		}
 	}
 }
-
-pub const IDENTIFIER_SYMBOLS: &[(&str, Identifier)] = &[
-	("let", Identifier::Let),
-	("print", Identifier::Print),
-	("if", Identifier::If),
-	("else", Identifier::Else),
-	("while", Identifier::While),
-	("fn", Identifier::Function),
-	("return", Identifier::Return),
-];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Literal {
@@ -146,4 +138,15 @@ pub const TOKEN_SYMBOLS: &[(&str, Token)] = &[
 	(">", Token::GreaterThan),
 	(">=", Token::GreaterThanEqual),
 	("->", Token::Arrow),
+	("&", Token::Ampersand),
+];
+
+pub const KEYWORD_TOKENS: &[(&str, Token)] = &[
+	("let", Token::Let),
+	("print", Token::Print),
+	("if", Token::If),
+	("else", Token::Else),
+	("while", Token::While),
+	("fn", Token::Function),
+	("return", Token::Return),
 ];

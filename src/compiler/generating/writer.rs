@@ -4,7 +4,7 @@ use std::io::Write;
 use crate::error::*;
 use crate::generating::llvm::LLVMValue;
 
-use super::{Constant, FunctionSignature, Label, RegisterFormat, VirtualRegister};
+use super::{Constant, Label, RegisterFormat, VirtualRegister};
 
 #[derive(Debug)]
 pub struct Writer {
@@ -67,12 +67,12 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 
 	// Load src register into target
 	pub fn write_load(&mut self, src: &LLVMValue, trg: &VirtualRegister) -> Result<()> {
-		self.writeln(&format!("\t{trg} = load {}, {} {src}", trg.reg_type(), src.val_type()))
+		self.writeln(&format!("\t{trg} = load {}, {} {src}", trg.reg_type(), src.format().format_type()))
 	}
 
 	// Store value in register
 	pub fn write_store(&mut self, src: &LLVMValue, trg: &LLVMValue) -> Result<()> {
-		self.writeln(&format!("\tstore {} {src}, {} {trg}", src.val_type(), trg.val_type()))
+		self.writeln(&format!("\tstore {} {src}, {} {trg}", src.format().format_type(), trg.format().format_type()))
 	}
 
 	// Write a multiplication to the LLVM file
@@ -186,7 +186,7 @@ attributes #1 = {{ \"frame-pointer\"=\"all\" \"no-trapping-math\"=\"true\" \"sta
 		if let RegisterFormat::Void = ret_reg.format() {} else {
 			self.write(&format!("{ret_reg} = "))?;
 		}
-		self.write(&format!("\tcall {ret_type} @{name}(", ret_type=ret_reg.val_type()))?;
+		self.write(&format!("call {ret_type} @{name}(", ret_type=ret_reg.val_type()))?;
 
 		for (i, arg) in arg_vals.iter().enumerate() {
 			self.write(&format!("{arg_type} {arg}", arg_type=arg.val_type()))?;

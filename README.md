@@ -1,1 +1,1 @@
-Compiler buit in Rust using LLVM-IR. Compiles a hybrid Lua/Rust (Rua) language.
+Compiler buit in Rust using LLVM-IR. Compiles a Rustified C language.

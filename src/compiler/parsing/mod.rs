@@ -81,6 +81,23 @@ impl Parser {
 		if std::mem::discriminant(&matched_identifier) == std::mem::discriminant(&identifier) { Ok(()) } else { Err(Error::InvalidIdentifier { expected: [identifier].to_vec(), received: matched_identifier })}
 	}
 
+	// Parse type of current token(s)
+	pub fn parse_type(&mut self) -> Result<Type> {
+		let mut res: Type;
+		let type_id = self.match_identifier()?;
+		self.scan_next()?;
+		res = match type_id {
+			Identifier::Symbol(c) => Ok(Type::Named { type_name: c }),
+			_ => Err(Error::TypeExpected { received: type_id })
+		}?;
+		while self.match_token(&[Token::Asterisk]).is_ok() {
+			self.scan_next()?;
+			res = Type::Pointer { pointee_type: Box::new(res) };
+		}
+
+		Ok(res)
+	}
+
 	// Parse a global statement (function for now)
 	pub fn parse_global_statement(&mut self) -> Result<Option<ASTNode>> {
 		if self.match_token(&[Token::EndOfFile]).is_ok() {
@@ -88,7 +105,7 @@ impl Parser {
 		}
 
 		// Should follow 'fn <name>(<param 1>, <param 2>, ...) { <body_block> }
-		self.expect_identifier(Identifier::Function)?;
+		self.match_token(&[Token::Function])?;
 		self.scan_next()?;
 
 		self.expect_identifier(Identifier::Symbol("".to_string()))?;
@@ -111,13 +128,7 @@ impl Parser {
 			// Param type is required
 			self.match_token(&[Token::Colon])?;
 			self.scan_next()?;
-			let type_id = self.match_identifier()?;
-			self.scan_next()?;
-
-			let param_type = match type_id {
-				Identifier::Symbol(t) => Type::Named { type_name: t},
-				_ => Err(Error::TypeExpected { received: type_id })?,
-			};
+			let param_type = self.parse_type()?;
 
 			if !self.match_token(&[Token::RightParen]).is_ok() {
 				self.match_token(&[Token::Comma])?;
@@ -138,12 +149,7 @@ impl Parser {
 		let return_type: Type;
 		if self.match_token(&[Token::Arrow]).is_ok() {
 			self.scan_next()?;
-			let type_id = self.match_identifier()?;
-			self.scan_next()?;
-			return_type = match type_id {
-				Identifier::Symbol(t) => Type::Named { type_name: t },
-				_ => Err(Error::TypeExpected { received: type_id })?,
-			};
+			return_type = self.parse_type()?;
 		} else {
 			return_type = Type::Void;
 		}
@@ -161,10 +167,10 @@ impl Parser {
 		}
 
 		// Statement should follow the pattern "<identifier> <binary_expr> ;"
-		let identifier = self.match_identifier()?;
+		let token = self.current_token.clone().unwrap();
 
-		Ok(Some(match &identifier {
-			Identifier::Print => {
+		Ok(Some(match token {
+			Token::Print => {
 				self.scan_next()?;
 				Ok(ASTNode::Print {
 					expr: {
@@ -176,7 +182,7 @@ impl Parser {
 					}
 				})
 			},
-			Identifier::Let => {
+			Token::Let => {
 				self.scan_next()?;
 				// Let should be formatted as either 'let <symbol> = <value>;' or 'let <symbol>;'
 				let id = self.match_identifier()?;
@@ -200,12 +206,7 @@ impl Parser {
 								})
 							},
 							Token::Colon => {
-								let type_id = self.match_identifier()?;
-								self.scan_next()?;
-								let val_type = Some(match type_id {
-									Identifier::Symbol(t) => Type::Named { type_name: t },
-									_ => Err(Error::TypeExpected { received: type_id })?,
-								});
+								let val_type = self.parse_type()?;
 								let semi_or_eq = self.match_token(&[Token::Semicolon, Token::Equals])?;
 								self.scan_next()?;
 
@@ -217,12 +218,12 @@ impl Parser {
 
 										Ok(ASTNode::Let {
 											name: symbol,
-											val_type,
+											val_type: Some(val_type),
 											value: val,
 										})
 									},
 									_ => {
-										Ok(ASTNode::Let { name: symbol, val_type, value: None })
+										Ok(ASTNode::Let { name: symbol, val_type: Some(val_type), value: None })
 									}
 								}
 							}
@@ -232,7 +233,7 @@ impl Parser {
 					_ => Err(Error::InvalidIdentifier { expected: [Identifier::Symbol("".to_string())].to_vec(), received: id })
 				}
 			},
-			Identifier::If => {
+			Token::If => {
 				self.scan_next()?;
 				// Follows 'if <expr> <block>'
 				// Should get a boolean expression after if;
@@ -240,7 +241,7 @@ impl Parser {
 
 				// Parse a block statement and error if there isn't one
 				let block = self.parse_block_statement()?;
-				let is_else = self.expect_identifier(Identifier::Else).is_ok();
+				let is_else = self.match_token(&[Token::Else]).is_ok();
 				if is_else {
 					self.scan_next()?;
 				}
@@ -249,7 +250,7 @@ impl Parser {
 
 				Ok(ASTNode::If { expr, block, else_block })
 			},
-			Identifier::While => {
+			Token::While => {
 				self.scan_next()?;
 				// Follows 'while <expr> <block>'
 				// Expecting boolean expression after keyword
@@ -260,7 +261,7 @@ impl Parser {
 
 				Ok(ASTNode::While { expr, block })
 			},
-			Identifier::Return => {
+			Token::Return => {
 				self.scan_next()?;
 				if self.match_token(&[Token::Semicolon]).is_ok() {
 					self.scan_next()?;
@@ -272,13 +273,12 @@ impl Parser {
 					Ok(ASTNode::Return { return_val })
 				}
 			},
-			Identifier::Symbol(_) => {
+			_ => {
 				let result = self.parse_binary_operation(0)?;
 				self.scan_next()?;
 
 				Ok(result)
 			},
-			_ => Err(Error::InvalidIdentifier { received: identifier, expected: [Identifier::If, Identifier::Print, Identifier::Let, Identifier::Symbol("".to_string())].to_vec() }),
 		}?))
 	}
 
@@ -311,6 +311,14 @@ impl Parser {
 				let res = self.parse_binary_operation(0)?;
 				self.scan_next()?; 
 				Ok(res)
+			},
+			Token::Asterisk => {
+				self.scan_next()?;
+				Ok(ASTNode::Dereference { child: Box::new(self.parse_terminal_node()?) })
+			},
+			Token::Ampersand => {
+				self.scan_next()?;
+				Ok(ASTNode::Reference { child: Box::new(self.parse_terminal_node()?) })
 			},
 			Token::Literal(Literal::Integer(x)) => {self.scan_next()?; Ok(ASTNode::Literal(Literal::Integer(x)))},
 			Token::Literal(Literal::Identifier(Identifier::Symbol(c))) => {
